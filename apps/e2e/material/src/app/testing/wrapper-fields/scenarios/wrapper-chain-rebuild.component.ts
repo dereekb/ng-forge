@@ -18,7 +18,10 @@ import { DynamicForm, FormConfig } from '@ng-forge/dynamic-forms';
         <h2>Wrapper Chain Rebuild</h2>
         <p class="scenario-description">Toggling the wrapper chain should not tear down the input — focus, caret, and value persist.</p>
 
-        <button type="button" data-testid="toggle-wrappers" (click)="toggleWrappers()">Toggle wrappers</button>
+        <!-- tabindex=-1 + preventDefault on mousedown keeps focus on the input. -->
+        <button type="button" tabindex="-1" data-testid="toggle-wrappers" (mousedown)="$event.preventDefault()" (click)="toggleWrappers()">
+          Toggle wrappers
+        </button>
 
         <form [dynamic-form]="config()" [(value)]="formValue"></form>
       </section>
@@ -29,12 +32,16 @@ export class WrapperChainRebuildComponent {
   private readonly wrapped = signal(false);
 
   protected readonly config = computed<FormConfig>(() => ({
+    // Toggle the chain at the form level — goes through `DEFAULT_WRAPPERS`,
+    // which is reactive. A field-level toggle wouldn't propagate here because
+    // `reconcileFields` preserves the old `ResolvedField` (and its frozen
+    // fieldDef) when component + injector match.
+    defaultWrappers: this.wrapped() ? [{ type: 'css', cssClasses: 'chain-rebuild-wrap' }] : undefined,
     fields: [
       {
         key: 'focused',
         type: 'input',
         label: 'Focused input',
-        wrappers: this.wrapped() ? [{ type: 'css', cssClasses: 'chain-rebuild-wrap' }] : [],
       },
     ],
   }));

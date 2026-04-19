@@ -79,6 +79,8 @@ export class DfFieldOutlet {
    * cascade-destroys it.
    */
   private fieldSlot: ViewContainerRef | undefined;
+  /** Focus + caret captured during detach, replayed after re-insert. */
+  private focusSnapshot: { element: HTMLElement; selectionStart: number | null; selectionEnd: number | null } | undefined;
   /**
    * Last rawInputs reference pushed to the innermost field. Used to dedupe the
    * rawInputs effect when the same snapshot was already applied as part of the
@@ -123,26 +125,24 @@ export class DfFieldOutlet {
       renderInnermost: (slot) => {
         const resolved = this.dfFieldOutlet();
         if (this.fieldRef && this.fieldRef.componentType === resolved.component) {
-          // Same component class as before — re-insert the preserved hostView
-          // instead of creating a new one. Preserves focus / caret / scroll
-          // across wrapper chain rebuilds.
+          // Same component class — re-insert the preserved hostView. Browser
+          // loses focus on detach, so we replay the snapshot captured in
+          // detachFieldRef. Input value persists on the DOM node itself.
           slot.insert(this.fieldRef.hostView);
           this.fieldSlot = slot;
-          // Re-push rawInputs in case they changed between detach and reinsert.
           this.pushRawInputs(this.fieldRef, this.rawInputs());
+          this.restoreFocusSnapshot();
           return;
         }
-        // Different component class — discard the detached ref (if any) and
-        // create a new one in the fresh slot.
+        // Different component class — discard the old ref and create fresh.
+        this.focusSnapshot = undefined;
         this.fieldRef?.destroy();
         this.fieldRef = slot.createComponent(resolved.component, {
           environmentInjector: this.fieldEnvInjector(),
           injector: resolved.injector,
         });
         this.fieldSlot = slot;
-        // Reset the per-field push cache so the new fieldRef receives every input
-        // — particularly the required `key`, which would otherwise be skipped by
-        // the ref-diff check when the new field shares a key value with the old.
+        // Reset per-field push cache so a shared `key` value is still pushed.
         this.lastPushedInputs = undefined;
         this.pushRawInputs(this.fieldRef, this.rawInputs());
       },
@@ -173,9 +173,35 @@ export class DfFieldOutlet {
       this.fieldRef = undefined;
       return;
     }
+    this.captureFocusSnapshot();
     const idx = this.fieldSlot.indexOf(this.fieldRef.hostView);
     if (idx >= 0) this.fieldSlot.detach(idx);
     this.fieldSlot = undefined;
+  }
+
+  /** Capture active element + selection before the hostView is detached from DOM. */
+  private captureFocusSnapshot(): void {
+    if (!this.fieldRef) return;
+    const hostEl = this.fieldRef.location.nativeElement as HTMLElement;
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !hostEl.contains(active)) return;
+    const sel = active as HTMLInputElement & HTMLTextAreaElement;
+    this.focusSnapshot = {
+      element: active,
+      selectionStart: typeof sel.selectionStart === 'number' ? sel.selectionStart : null,
+      selectionEnd: typeof sel.selectionEnd === 'number' ? sel.selectionEnd : null,
+    };
+  }
+
+  /** Re-apply the pre-detach focus + caret after the hostView is back in the DOM. */
+  private restoreFocusSnapshot(): void {
+    const snap = this.focusSnapshot;
+    this.focusSnapshot = undefined;
+    if (!snap || !snap.element.isConnected) return;
+    snap.element.focus();
+    if (snap.selectionStart !== null && snap.selectionEnd !== null && 'setSelectionRange' in snap.element) {
+      (snap.element as HTMLInputElement).setSelectionRange(snap.selectionStart, snap.selectionEnd);
+    }
   }
 
   private pushRawInputs(ref: ComponentRef<unknown>, rawInputs: Record<string, unknown>): void {

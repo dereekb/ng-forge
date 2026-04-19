@@ -26,27 +26,13 @@ export function isSameWrapperChain(a: readonly WrapperConfig[], b: readonly Wrap
 /**
  * Resolves the wrapper chain for a field.
  *
- * Merge order is **outermost → innermost**, most-global to most-specific:
- *   1. Auto-associations — from `WRAPPER_AUTO_ASSOCIATIONS` (registration-time).
- *   2. Form-level defaults — `FormConfig.defaultWrappers`.
- *   3. Field-level — `FieldDef.wrappers` (if non-null).
- *
- * Rationale: auto-associations are "the library says this wrapper must be on
- * every X", so they sit outside everything. Defaults are form-wide chrome.
- * Field-level wrappers are the field's own concern and render closest to it.
- *
- * `field.wrappers`:
- * - `undefined` — inherit (auto + defaults).
- * - `null` — skip **all three** layers; render bare. This is blunt — there's
- *   no per-layer opt-out today (e.g. skip auto but keep defaults). If you
- *   need that, it's a feature request, not a workaround.
- * - `[]` — **does not** opt out; auto + defaults still apply.
- *
- * A fresh array is allocated per call; downstream memoisation is via
- * `isSameWrapperChain` on the consuming computed's `equal`, not here.
+ * Merge order (outermost → innermost): auto-associations, form defaults,
+ * field-level wrappers. `wrappers: null` skips all three; `skipAutoWrappers` /
+ * `skipDefaultWrappers` on the field opt out of individual layers. Fresh
+ * array per call — downstream memoisation is on the consuming computed.
  */
 export function resolveWrappers(
-  field: Pick<FieldDef<unknown>, 'type' | 'wrappers'>,
+  field: Pick<FieldDef<unknown>, 'type' | 'wrappers' | 'skipAutoWrappers' | 'skipDefaultWrappers'>,
   defaultWrappers: readonly WrapperConfig[] | undefined,
   autoAssociations: WrapperAutoAssociations,
 ): readonly WrapperConfig[] {
@@ -54,8 +40,8 @@ export function resolveWrappers(
     return EMPTY_WRAPPERS;
   }
 
-  const autoWrappers = autoAssociations.get(field.type) ?? EMPTY_WRAPPERS;
-  const defaults = defaultWrappers ?? EMPTY_WRAPPERS;
+  const autoWrappers = field.skipAutoWrappers ? EMPTY_WRAPPERS : (autoAssociations.get(field.type) ?? EMPTY_WRAPPERS);
+  const defaults = field.skipDefaultWrappers ? EMPTY_WRAPPERS : (defaultWrappers ?? EMPTY_WRAPPERS);
   const fieldLevel = field.wrappers ?? EMPTY_WRAPPERS;
 
   if (autoWrappers.length === 0 && defaults.length === 0 && fieldLevel.length === 0) {

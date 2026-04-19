@@ -83,6 +83,8 @@ describe('MatInputField (String) - Exhaustive Whitelist', () => {
     | 'excludeValueIfDisabled'
     | 'excludeValueIfReadonly'
     | 'wrappers'
+    | 'skipAutoWrappers'
+    | 'skipDefaultWrappers'
     // From FieldWithValidation
     | 'required'
     | 'email'
@@ -234,6 +236,8 @@ describe('MatInputField (Number) - Exhaustive Whitelist', () => {
     | 'excludeValueIfDisabled'
     | 'excludeValueIfReadonly'
     | 'wrappers'
+    | 'skipAutoWrappers'
+    | 'skipDefaultWrappers'
     | 'required'
     | 'email'
     | 'min'

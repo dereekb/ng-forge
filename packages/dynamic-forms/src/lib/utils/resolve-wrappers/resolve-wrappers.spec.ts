@@ -3,7 +3,7 @@ import { isSameWrapperChain, resolveWrappers } from './resolve-wrappers';
 import { WrapperConfig } from '../../models/wrapper-type';
 import { FieldDef } from '../../definitions/base/field-def';
 
-type TestField = Pick<FieldDef<unknown>, 'type' | 'wrappers'>;
+type TestField = Pick<FieldDef<unknown>, 'type' | 'wrappers' | 'skipAutoWrappers' | 'skipDefaultWrappers'>;
 
 /**
  * Shorthand: build an auto-association map from `{ fieldType: [wrapperNames] }`.
@@ -87,6 +87,54 @@ describe('resolveWrappers', () => {
 
     expect(first).toBe(second);
     expect(first).toEqual([]);
+  });
+
+  it('skipAutoWrappers drops the auto layer but keeps defaults + field-level', () => {
+    const defaults: readonly WrapperConfig[] = [{ type: 'card' } as WrapperConfig];
+    const field: TestField = {
+      type: 'input',
+      skipAutoWrappers: true,
+      wrappers: [{ type: 'field-specific' } as WrapperConfig],
+    };
+
+    const result = resolveWrappers(field, defaults, autoAssoc({ input: ['validation'] }));
+
+    expect(result).toEqual([{ type: 'card' }, { type: 'field-specific' }]);
+  });
+
+  it('skipDefaultWrappers drops the defaults layer but keeps auto + field-level', () => {
+    const defaults: readonly WrapperConfig[] = [{ type: 'card' } as WrapperConfig];
+    const field: TestField = {
+      type: 'input',
+      skipDefaultWrappers: true,
+      wrappers: [{ type: 'field-specific' } as WrapperConfig],
+    };
+
+    const result = resolveWrappers(field, defaults, autoAssoc({ input: ['validation'] }));
+
+    expect(result).toEqual([{ type: 'validation' }, { type: 'field-specific' }]);
+  });
+
+  it('both skip flags together with no field wrappers produces an empty chain', () => {
+    const defaults: readonly WrapperConfig[] = [{ type: 'card' } as WrapperConfig];
+    const field: TestField = {
+      type: 'input',
+      skipAutoWrappers: true,
+      skipDefaultWrappers: true,
+    };
+
+    expect(resolveWrappers(field, defaults, autoAssoc({ input: ['validation'] }))).toEqual([]);
+  });
+
+  it('wrappers: null beats the skip flags — bare is bare', () => {
+    const field: TestField = {
+      type: 'input',
+      wrappers: null,
+      skipAutoWrappers: false,
+      skipDefaultWrappers: false,
+    };
+
+    expect(resolveWrappers(field, [{ type: 'card' } as WrapperConfig], autoAssoc({ input: ['validation'] }))).toEqual([]);
   });
 });
 

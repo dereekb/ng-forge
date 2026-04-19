@@ -69,6 +69,8 @@ describe('PrimeCheckboxField - Exhaustive Whitelist', () => {
     | 'excludeValueIfDisabled'
     | 'excludeValueIfReadonly'
     | 'wrappers'
+    | 'skipAutoWrappers'
+    | 'skipDefaultWrappers'
     // From FieldWithValidation
     | 'required'
     | 'email'

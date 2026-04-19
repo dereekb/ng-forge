@@ -49,6 +49,48 @@ test.describe('Wrapper Fields E2E Tests', () => {
     });
   });
 
+  test.describe('Wrapper chain rebuild', () => {
+    test('preserves focus + caret + value when wrappers change on a stable component class', async ({ page }) => {
+      await page.goto('/#/test/wrapper-fields/wrapper-chain-rebuild');
+      await page.waitForLoadState('networkidle');
+      const scenario = page.locator('[data-testid="wrapper-chain-rebuild"]');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const input = scenario.locator('#focused input');
+      await expect(input).toBeVisible({ timeout: 5000 });
+
+      // Type, then drop caret in the middle of the value.
+      await input.focus();
+      await input.fill('hello');
+      await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(3, 3));
+
+      // Flip the wrapper chain — triggers a structural rebuild of the chain.
+      await scenario.locator('[data-testid="toggle-wrappers"]').click();
+
+      // New wrapper mounted around the same input.
+      await expect(scenario.locator('df-css-wrapper')).toHaveCount(1, { timeout: 5000 });
+
+      // Same DOM node — not recreated.
+      const stillFocused = await input.evaluate((el) => document.activeElement === el);
+      expect(stillFocused).toBe(true);
+
+      const value = await input.inputValue();
+      expect(value).toBe('hello');
+
+      const caretStart = await input.evaluate((el: HTMLInputElement) => el.selectionStart);
+      expect(caretStart).toBe(3);
+
+      // And again in the reverse direction — remove wrapper, still preserved.
+      await scenario.locator('[data-testid="toggle-wrappers"]').click();
+      await expect(scenario.locator('df-css-wrapper')).toHaveCount(0, { timeout: 5000 });
+
+      const stillFocusedAfterRemove = await input.evaluate((el) => document.activeElement === el);
+      expect(stillFocusedAfterRemove).toBe(true);
+      expect(await input.inputValue()).toBe('hello');
+      expect(await input.evaluate((el: HTMLInputElement) => el.selectionStart)).toBe(3);
+    });
+  });
+
   test.describe('Default wrappers + opt-out', () => {
     test('applies defaults to every field except the one opting out', async ({ page, helpers }) => {
       const scenario = helpers.getScenario('wrapper-defaults');

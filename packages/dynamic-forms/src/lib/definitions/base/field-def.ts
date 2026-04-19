@@ -262,20 +262,25 @@ export interface FieldDef<TProps, TMeta extends FieldMeta = FieldMeta> {
   /**
    * Wrapper components to chain around this field.
    *
-   * Three states:
-   * - `undefined` — inherit from form-level `defaultWrappers` plus any
-   *   wrappers that auto-apply to this field's `type` via their `types` array.
-   * - `null` — **explicit opt-out**: no auto-associations, no defaults, no
-   *   field-level wrappers. Render the field bare.
-   * - `readonly WrapperConfig[]` — add these wrappers *in addition to* auto
-   *   and default wrappers (auto-associations are outermost, defaults next,
-   *   field-level innermost). **Note:** `wrappers: []` is *not* an opt-out —
-   *   it still inherits auto-associations and defaults. Use `wrappers: null`
-   *   to render bare.
-   *
-   * Container fields (`type: 'container'`) override this to a required array.
+   * - `undefined` — inherit auto-associations + form defaults.
+   * - `null` — render bare (see `skipAuto`/`skipDefaults` for partial opt-out).
+   * - `readonly WrapperConfig[]` — merged innermost with auto + defaults.
+   * - `[]` is **not** an opt-out; inherits like `undefined`.
    */
   wrappers?: readonly WrapperConfig[] | null;
+
+  /**
+   * Skip the auto-association layer (`WrapperTypeDefinition.types`) while
+   * keeping form-level defaults and any field-level `wrappers`. Use when a
+   * global wrapper auto-applies to this field type but isn't wanted here.
+   */
+  skipAutoWrappers?: boolean;
+
+  /**
+   * Skip the form-level `defaultWrappers` layer while keeping auto-associations
+   * and any field-level `wrappers`.
+   */
+  skipDefaultWrappers?: boolean;
 }
 
 type IncludedKeys = 'label' | 'className' | 'hidden' | 'tabIndex';

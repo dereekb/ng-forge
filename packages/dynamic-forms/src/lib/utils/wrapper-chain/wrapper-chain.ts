@@ -188,6 +188,9 @@ function renderStep(
     setInputIfDeclared(ref, 'fieldInputs', options.fieldInputs);
   }
 
+  // Required to resolve `viewChild.required('fieldComponent')` before we
+  // recurse into the slot. O(chain length) CD passes per rebuild — acceptable
+  // for typical chains (≤3); refactor to a template-based render if it bites.
   ref.changeDetectorRef.detectChanges();
 
   const inner = resolveInnerSlot(ref);

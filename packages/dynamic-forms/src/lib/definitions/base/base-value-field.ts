@@ -58,7 +58,9 @@ type ExcludedKeys =
   | 'excludeValueIfDisabled'
   | 'excludeValueIfReadonly'
   // Wrappers are consumed by DfFieldOutlet / ContainerFieldComponent, not individual fields
-  | 'wrappers';
+  | 'wrappers'
+  | 'skipAutoWrappers'
+  | 'skipDefaultWrappers';
 // Note: 'meta' is NOT excluded - components must handle meta attributes
 
 export type ValueFieldComponent<T extends BaseValueField<Record<string, unknown> | unknown, unknown>> = Prettify<

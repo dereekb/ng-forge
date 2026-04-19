@@ -22,6 +22,10 @@ const routes: Routes = [
     loadComponent: () => import('../shared/test-scenario.component').then((m) => m.TestScenarioComponent),
     data: { scenario: getWrapperFieldsScenario('wrapper-defaults') },
   },
+  {
+    path: 'wrapper-chain-rebuild',
+    loadComponent: () => import('./scenarios/wrapper-chain-rebuild.component').then((m) => m.WrapperChainRebuildComponent),
+  },
 ];
 
 export default routes;

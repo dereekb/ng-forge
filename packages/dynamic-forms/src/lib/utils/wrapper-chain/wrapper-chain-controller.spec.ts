@@ -218,6 +218,49 @@ describe('createWrapperChainController', () => {
     f.destroy();
   });
 
+  it('accepts a viewChild.required signal as vcr — no race against post-init resolution', async () => {
+    // Regresses the concern that toObservable(chainKey).subscribe() might fire
+    // before a viewChild.required('slot') has resolved. The signal is read only
+    // inside the subscribe callback, which runs via Angular's effect scheduler
+    // after the first CD cycle — viewChild.required is resolved by then.
+    const registry = new Map<string, WrapperTypeDefinition>();
+    const cache = new Map<string, Type<unknown>>();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: WRAPPER_REGISTRY, useValue: registry },
+        { provide: WRAPPER_COMPONENT_CACHE, useValue: cache },
+        { provide: DynamicFormLogger, useValue: new NoopLogger() },
+      ],
+    });
+    const fixture = TestBed.createComponent(TestHostComponent);
+    // NB: do NOT detectChanges() yet — viewChild is still unresolved here.
+    const viewChildVcr = fixture.componentInstance.slot; // the raw Signal<ViewContainerRef>
+    const wrappers = signal<readonly WrapperConfig[]>([]);
+    const rebuildKey = signal<unknown>(TestLeafA);
+    const envInjector = TestBed.inject(EnvironmentInjector);
+    const injector = TestBed.inject(Injector);
+
+    let innermostCalls = 0;
+    runInInjectionContext(fixture.componentRef.injector, () => {
+      createWrapperChainController({
+        vcr: viewChildVcr,
+        wrappers,
+        rebuildKey,
+        renderInnermost: (s) => {
+          innermostCalls++;
+          s.createComponent(TestLeafA, { environmentInjector: envInjector, injector });
+        },
+      });
+    });
+    // Now run CD — viewChild resolves, effect schedules, subscribe fires.
+    fixture.detectChanges();
+    await flush();
+
+    expect(innermostCalls).toBe(1);
+    expect(TestLeafA.instances).toBe(1);
+    fixture.destroy();
+  });
+
   it('rebuilds when rebuildKey changes to a different component class', async () => {
     const f = setupController();
     await flush();

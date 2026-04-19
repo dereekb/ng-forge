@@ -41,6 +41,13 @@ export interface WrapperChainControllerOptions {
    */
   readonly rebuildKey?: Signal<unknown>;
   /**
+   * Optional field-level injector signal (e.g. `ResolvedField.injector`). When
+   * provided, wrapper components see a merged injector — field tokens first
+   * (`ARRAY_CONTEXT`, `FIELD_SIGNAL_CONTEXT`), element chain behind
+   * (parent wrappers). Containers omit this.
+   */
+  readonly fieldInjector?: Signal<Injector>;
+  /**
    * Renders whatever belongs at the innermost slot (a field component, a children
    * template, …). Called each time the chain mounts or structurally rebuilds.
    */
@@ -93,7 +100,6 @@ interface ChainDeps {
   readonly logger: Logger;
   readonly destroyRef: DestroyRef;
   readonly environmentInjector: EnvironmentInjector;
-  readonly parentInjector: Injector;
 }
 
 interface ChainState {
@@ -126,7 +132,6 @@ function injectChainDeps(): ChainDeps {
     logger: inject(DynamicFormLogger),
     destroyRef: inject(DestroyRef),
     environmentInjector: inject(EnvironmentInjector),
-    parentInjector: inject(Injector),
   };
 }
 
@@ -201,9 +206,9 @@ function applyEmission({ state, loaded }: ChainEmission, ctx: EmissionApplyConte
     outerContainer: vcr,
     loadedWrappers: loaded,
     environmentInjector: deps.environmentInjector,
-    parentInjector: deps.parentInjector,
     logger: deps.logger,
     fieldInputs: opts.fieldInputs?.(),
+    fieldInjector: opts.fieldInjector?.(),
     renderInnermost: opts.renderInnermost,
   });
   mounted.value = { wrappers: state.wrappers, rebuildKey: state.rebuildKey };

@@ -15,7 +15,7 @@ import { explicitEffect } from 'ngxtension/explicit-effect';
 import { ResolvedField } from '../utils/resolve-field/resolve-field';
 import { WRAPPER_AUTO_ASSOCIATIONS } from '../models/wrapper-type';
 import { DEFAULT_WRAPPERS } from '../models/field-signal-context.token';
-import { setInputIfDeclared } from '../utils/wrapper-chain/wrapper-chain';
+import { createWrapperAwareInjector, setInputIfDeclared } from '../utils/wrapper-chain/wrapper-chain';
 import { createWrapperChainController } from '../utils/wrapper-chain/wrapper-chain-controller';
 import { isSameWrapperChain, resolveWrappers } from '../utils/resolve-wrappers/resolve-wrappers';
 import { READONLY_FIELD_TREE_CACHE, toReadonlyFieldTreeCached } from '../core/field-tree-utils';
@@ -113,6 +113,8 @@ export class DfFieldOutlet {
   private readonly defaultEnvInjector = inject(EnvironmentInjector);
   /** Environment injector for the innermost field component — `[environmentInjector]` input takes precedence over the directive's own DI. */
   private readonly fieldEnvInjector = computed(() => this.dfFieldOutletEnvironmentInjector() ?? this.defaultEnvInjector);
+  /** Field-level injector (FIELD_SIGNAL_CONTEXT, ARRAY_CONTEXT, …). Threaded to the controller so wrappers can inject it too. */
+  private readonly fieldInjector = computed(() => this.dfFieldOutlet().injector);
 
   constructor() {
     createWrapperChainController({
@@ -121,6 +123,7 @@ export class DfFieldOutlet {
       gate: this.renderReady,
       rebuildKey: this.componentIdentity,
       fieldInputs: this.fieldInputs,
+      fieldInjector: this.fieldInjector,
       beforeRebuild: () => this.detachFieldRef(),
       renderInnermost: (slot) => {
         const resolved = this.dfFieldOutlet();
@@ -135,11 +138,13 @@ export class DfFieldOutlet {
           return;
         }
         // Different component class — discard the old ref and create fresh.
+        // Merge field + element injectors so the field can inject ancestor
+        // wrappers AND form-context tokens (ARRAY_CONTEXT etc.).
         this.focusSnapshot = undefined;
         this.fieldRef?.destroy();
         this.fieldRef = slot.createComponent(resolved.component, {
           environmentInjector: this.fieldEnvInjector(),
-          injector: resolved.injector,
+          injector: createWrapperAwareInjector(resolved.injector, slot.injector),
         });
         this.fieldSlot = slot;
         // Reset per-field push cache so a shared `key` value is still pushed.

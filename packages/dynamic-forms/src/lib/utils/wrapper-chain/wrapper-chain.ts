@@ -1,4 +1,13 @@
-import { ComponentRef, EnvironmentInjector, Injector, reflectComponentType, Type, ViewContainerRef } from '@angular/core';
+import {
+  ComponentRef,
+  EnvironmentInjector,
+  InjectOptions,
+  Injector,
+  ProviderToken,
+  reflectComponentType,
+  Type,
+  ViewContainerRef,
+} from '@angular/core';
 import { catchError, forkJoin, from, map, Observable, of } from 'rxjs';
 import { FieldWrapperContract, WrapperConfig, WrapperTypeDefinition } from '../../models/wrapper-type';
 import { Logger } from '../../providers/features/logger/logger.interface';
@@ -129,7 +138,6 @@ export interface RenderWrapperChainOptions {
   readonly outerContainer: ViewContainerRef;
   readonly loadedWrappers: readonly LoadedWrapper[];
   readonly environmentInjector: EnvironmentInjector;
-  readonly parentInjector: Injector;
   readonly logger: Logger;
   /**
    * Optional mapper outputs to set as `fieldInputs` on each wrapper in the chain.
@@ -137,6 +145,14 @@ export interface RenderWrapperChainOptions {
    * not a single field).
    */
   readonly fieldInputs?: WrapperFieldInputs;
+  /**
+   * Optional field-level injector (e.g. `ResolvedField.injector`). When provided,
+   * each wrapper is created with a merged injector that checks the field's
+   * tokens first (`FIELD_SIGNAL_CONTEXT`, `ARRAY_CONTEXT`, …) and falls back to
+   * the element injector — so wrappers can inject both field context AND outer
+   * wrappers up the element hierarchy.
+   */
+  readonly fieldInjector?: Injector;
   /** Renders whatever belongs at the innermost slot (a field component, a children template, …). */
   readonly renderInnermost: (slot: ViewContainerRef) => void;
 }
@@ -171,9 +187,15 @@ function renderStep(
 
   const [wrapper, ...rest] = remaining;
 
+  // `slot.injector` is the element injector seen from inside the current slot —
+  // for nested slots that includes the outer wrapper's component, enabling
+  // `inject(OuterWrapper)`. When a field injector is provided we merge it in
+  // front so tokens like `ARRAY_CONTEXT` also resolve.
+  const wrapperInjector = options.fieldInjector ? createWrapperAwareInjector(options.fieldInjector, slot.injector) : slot.injector;
+
   const ref = slot.createComponent(wrapper.component, {
     environmentInjector: options.environmentInjector,
-    injector: options.parentInjector,
+    injector: wrapperInjector,
   });
   refs.push(ref);
 
@@ -224,5 +246,38 @@ function resolveInnerSlot(ref: ComponentRef<unknown>): ViewContainerRef | undefi
     // the query couldn't resolve. Angular uses a negative code here.
     if ((err as { code?: number }).code === -951) return undefined;
     throw err;
+  }
+}
+
+/**
+ * Merged injector: check the field-level injector first (for tokens like
+ * `ARRAY_CONTEXT` / `FIELD_SIGNAL_CONTEXT`), fall back to the element-chain
+ * injector (so nested wrappers can still `inject(OuterWrapper)`).
+ *
+ * Precedence: a field-level token shadows a same-named token provided by an
+ * outer wrapper. That matches "more specific context wins" but is worth
+ * keeping in mind if a wrapper exports service tokens.
+ */
+export function createWrapperAwareInjector(fieldInjector: Injector, elementInjector: Injector): Injector {
+  if (fieldInjector === elementInjector) return fieldInjector;
+  return new WrapperAwareInjector(fieldInjector, elementInjector);
+}
+
+/** Sentinel — distinguishes "token not found" from a legitimate `undefined` provider value. */
+const WRAPPER_NOT_FOUND = {};
+
+class WrapperAwareInjector extends Injector {
+  constructor(
+    private readonly fieldInjector: Injector,
+    private readonly elementInjector: Injector,
+  ) {
+    super();
+  }
+
+  override get<T>(token: ProviderToken<T>, notFoundValue?: T, options?: InjectOptions): T;
+  override get(token: unknown, notFoundValue?: unknown, options?: InjectOptions): unknown {
+    const field = this.fieldInjector.get(token as ProviderToken<unknown>, WRAPPER_NOT_FOUND, options);
+    if (field !== WRAPPER_NOT_FOUND) return field;
+    return this.elementInjector.get(token as ProviderToken<unknown>, notFoundValue, options);
   }
 }

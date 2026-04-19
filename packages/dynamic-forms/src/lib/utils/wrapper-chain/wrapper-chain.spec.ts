@@ -49,6 +49,17 @@ class TestWrapperB implements FieldWrapperContract {
   readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
 }
 
+/** Nested wrapper that injects TestWrapperB — proves the element injector chain is intact. */
+@Component({
+  selector: 'test-wrapper-b-nested',
+  template: `<div data-wrapper="b-nested"><ng-container #fieldComponent></ng-container></div>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class TestWrapperBNested implements FieldWrapperContract {
+  readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
+  readonly parent = inject(TestWrapperB);
+}
+
 /** Wrapper whose #fieldComponent sits inside an @if — viewChild.required throws. */
 @Component({
   selector: 'test-wrapper-broken',
@@ -189,7 +200,6 @@ describe('wrapper-chain', () => {
           { config: { type: 'b' } as WrapperConfig, component: TestWrapperB },
         ],
         environmentInjector: envInjector,
-        parentInjector: envInjector,
         logger: silentLogger(),
         renderInnermost: innermost,
       });
@@ -201,12 +211,32 @@ describe('wrapper-chain', () => {
       expect(innermost).toHaveBeenCalledTimes(1);
     });
 
+    it('lets a nested wrapper inject its parent wrapper via the element injector', () => {
+      // Reported by dereekb: wrappers lost access to outer wrappers once the
+      // controller started passing a static parentInjector to every slot.
+      // Using `slot.injector` at each step keeps the element chain intact.
+      const refs = renderWrapperChain({
+        outerContainer: host.slot(),
+        loadedWrappers: [
+          { config: { type: 'b' } as WrapperConfig, component: TestWrapperB },
+          { config: { type: 'b-nested' } as WrapperConfig, component: TestWrapperBNested },
+        ],
+        environmentInjector: envInjector,
+        logger: silentLogger(),
+        renderInnermost: () => undefined,
+      });
+
+      expect(refs).toHaveLength(2);
+      const nested = refs[1].instance as TestWrapperBNested;
+      expect(nested.parent).toBeInstanceOf(TestWrapperB);
+      expect(nested.parent).toBe(refs[0].instance);
+    });
+
     it('pushes declared config props via setInput and ignores unknown keys', () => {
       renderWrapperChain({
         outerContainer: host.slot(),
         loadedWrappers: [{ config: { type: 'a', title: 'hi', bogus: 'ignored' } as unknown as WrapperConfig, component: TestWrapperA }],
         environmentInjector: envInjector,
-        parentInjector: envInjector,
         logger: silentLogger(),
         renderInnermost: () => undefined,
       });
@@ -223,7 +253,6 @@ describe('wrapper-chain', () => {
         outerContainer: host.slot(),
         loadedWrappers: [{ config: { type: 'broken' } as WrapperConfig, component: TestWrapperBroken }],
         environmentInjector: envInjector,
-        parentInjector: envInjector,
         logger,
         renderInnermost: innermost,
       });
@@ -240,7 +269,6 @@ describe('wrapper-chain', () => {
           { config: { type: 'b' } as WrapperConfig, component: TestWrapperB },
         ],
         environmentInjector: envInjector,
-        parentInjector: envInjector,
         logger: silentLogger(),
         renderInnermost: () => undefined,
       });

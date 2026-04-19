@@ -2,7 +2,8 @@
  * Exhaustive type tests for ContainerField type.
  */
 import { expectTypeOf } from 'vitest';
-import type { ContainerField, WrapperConfig, ContainerComponent } from './container-field';
+import type { ContainerField, ContainerComponent } from './container-field';
+import type { WrapperConfig } from '../../models/wrapper-type';
 import type { CssWrapper } from '../../wrappers/css/css-wrapper.type';
 import type { ContainerLogicConfig } from '../base/container-logic-config';
 import type { ContainerAllowedChildren } from '../../models/types/nesting-constraints';

@@ -148,9 +148,8 @@ export class DfFieldOutlet {
       },
     });
 
-    // Mapper outputs push-through: updates inputs on the innermost field without
-    // touching the chain structure. Ref-identity dedupe against `lastPushedInputs`
-    // skips the duplicate push that the controller's own render has already done.
+    // Push rawInputs to the innermost field. Safe mid-rebuild — renderInnermost
+    // re-reads rawInputs synchronously on mount, so skipping here loses nothing.
     explicitEffect([this.rawInputs], ([rawInputs]) => {
       if (!this.fieldRef) return;
       if (this.lastPushedInputs === rawInputs) return;
@@ -158,10 +157,7 @@ export class DfFieldOutlet {
     });
 
     this.destroyRef.onDestroy(() => {
-      // Only destroy explicitly when the fieldRef is detached from any VCR —
-      // the controller's onDestroy calls `vcr.clear()` which cascades through
-      // attached refs. Double-destroy would be benign (Angular is idempotent)
-      // but relying on that is unnecessary when `fieldSlot` tells us plainly.
+      // Only destroy when detached — vcr.clear() cascades otherwise.
       if (this.fieldRef && !this.fieldSlot) this.fieldRef.destroy();
       this.fieldRef = undefined;
       this.fieldSlot = undefined;
@@ -170,17 +166,20 @@ export class DfFieldOutlet {
   }
 
   private detachFieldRef(): void {
-    if (!this.fieldRef || !this.fieldSlot) return;
+    if (!this.fieldRef) return;
+    if (!this.fieldSlot) {
+      // Stranded fieldRef — destroy to prevent a leak.
+      this.fieldRef.destroy();
+      this.fieldRef = undefined;
+      return;
+    }
     const idx = this.fieldSlot.indexOf(this.fieldRef.hostView);
     if (idx >= 0) this.fieldSlot.detach(idx);
     this.fieldSlot = undefined;
   }
 
   private pushRawInputs(ref: ComponentRef<unknown>, rawInputs: Record<string, unknown>): void {
-    // Only push keys whose values actually changed since the previous emission.
-    // Mappers typically mutate one or two keys per tick; a full-sweep setInput
-    // would otherwise run the component's input-signal pipeline for every
-    // unchanged key on every keystroke.
+    // Ref-identity dedupe per key — mappers must emit immutable snapshots.
     const last = this.lastPushedInputs;
     for (const [key, value] of Object.entries(rawInputs)) {
       if (last && last[key] === value) continue;

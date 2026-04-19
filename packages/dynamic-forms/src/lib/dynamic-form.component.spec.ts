@@ -7,9 +7,9 @@ import TestCheckboxHarnessComponent from '../../testing/src/harnesses/test-check
 import { FIELD_REGISTRY, FieldTypeDefinition } from './models/field-type';
 import { checkboxFieldMapper, valueFieldMapper } from '@ng-forge/dynamic-forms/integration';
 import { BUILT_IN_FIELDS, BUILT_IN_WRAPPERS } from './providers/built-in-fields';
-import { WRAPPER_REGISTRY } from './models/wrapper-type';
+import { FieldWrapperContract, WRAPPER_REGISTRY, WrapperTypeDefinition } from './models/wrapper-type';
 import { BaseCheckedField, BaseValueField } from './definitions';
-import { DebugElement } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DebugElement, inject, input, viewChild, ViewContainerRef } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { FormResetEvent } from './events/constants/form-reset.event';
 import { FormClearEvent } from './events/constants/form-clear.event';
@@ -43,6 +43,38 @@ const TEST_FIELD_TYPES: FieldTypeDefinition[] = [
   },
 ];
 
+// -- Test wrapper components for cross-field DI tests --
+
+@Component({
+  selector: 'test-parent-wrapper',
+  template: `<div data-wrapper="parent"><ng-container #fieldComponent></ng-container></div>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class TestParentWrapperComponent implements FieldWrapperContract {
+  readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
+}
+
+@Component({
+  selector: 'test-child-wrapper',
+  template: `<div data-wrapper="child" [attr.data-has-parent]="!!parent"><ng-container #fieldComponent></ng-container></div>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class TestChildWrapperComponent implements FieldWrapperContract {
+  readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
+  readonly parent = inject(TestParentWrapperComponent);
+}
+
+const TEST_WRAPPER_TYPES: WrapperTypeDefinition[] = [
+  {
+    wrapperName: 'test-parent',
+    loadComponent: () => Promise.resolve({ default: TestParentWrapperComponent }),
+  },
+  {
+    wrapperName: 'test-child',
+    loadComponent: () => Promise.resolve({ default: TestChildWrapperComponent }),
+  },
+];
+
 describe('DynamicFormComponent', () => {
   const createComponent = (config: TestFormConfig = { fields: [] }, initialValue?: any) => {
     return SimpleTestUtils.createComponent(config, initialValue);
@@ -66,7 +98,13 @@ describe('DynamicFormComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DynamicForm, TestInputHarnessComponent, TestCheckboxHarnessComponent],
+      imports: [
+        DynamicForm,
+        TestInputHarnessComponent,
+        TestCheckboxHarnessComponent,
+        TestParentWrapperComponent,
+        TestChildWrapperComponent,
+      ],
       providers: [
         {
           provide: FIELD_REGISTRY,
@@ -88,6 +126,9 @@ describe('DynamicFormComponent', () => {
           useFactory: () => {
             const registry = new Map();
             BUILT_IN_WRAPPERS.forEach((wrapperType) => {
+              registry.set(wrapperType.wrapperName, wrapperType);
+            });
+            TEST_WRAPPER_TYPES.forEach((wrapperType) => {
               registry.set(wrapperType.wrapperName, wrapperType);
             });
             return registry;
@@ -2369,6 +2410,41 @@ describe('DynamicFormComponent', () => {
           deepField: 'nested',
         },
       });
+    });
+
+    it('should allow a child wrapper to inject a parent wrapper across nested fields', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'outer',
+            type: 'container',
+            fields: [
+              {
+                key: 'inner',
+                type: 'container',
+                fields: [{ key: 'name', type: 'input', label: 'Name', value: 'test' }],
+                wrappers: [{ type: 'test-child' }],
+              },
+            ],
+            wrappers: [{ type: 'test-parent' }],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // The child wrapper should have successfully injected the parent wrapper.
+      // If injection failed, Angular would throw NullInjectorError and the child
+      // wrapper would not render at all.
+      const parentEl = fixture.nativeElement.querySelector('[data-wrapper="parent"]');
+      const childEl = fixture.nativeElement.querySelector('[data-wrapper="child"]');
+
+      expect(parentEl).toBeTruthy();
+      expect(childEl).toBeTruthy();
+      expect(childEl.getAttribute('data-has-parent')).toBe('true');
+      // Child wrapper should be nested inside the parent wrapper's DOM
+      expect(parentEl.contains(childEl)).toBe(true);
     });
   });
 

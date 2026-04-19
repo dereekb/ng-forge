@@ -1,4 +1,4 @@
-import { ComponentRef, EnvironmentInjector, Injector, reflectComponentType, Type, ViewContainerRef } from '@angular/core';
+import { ComponentRef, EnvironmentInjector, Injector, ProviderToken, reflectComponentType, Type, ViewContainerRef } from '@angular/core';
 import { catchError, forkJoin, from, map, Observable, of } from 'rxjs';
 import { FieldWrapperContract, WrapperConfig, WrapperTypeDefinition } from '../../models/wrapper-type';
 import { Logger } from '../../providers/features/logger/logger.interface';
@@ -173,7 +173,7 @@ function renderStep(
 
   const ref = slot.createComponent(wrapper.component, {
     environmentInjector: options.environmentInjector,
-    injector: options.parentInjector,
+    injector: slot.injector,
   });
   refs.push(ref);
 
@@ -224,5 +224,44 @@ function resolveInnerSlot(ref: ComponentRef<unknown>): ViewContainerRef | undefi
     // the query couldn't resolve. Angular uses a negative code here.
     if ((err as { code?: number }).code === -951) return undefined;
     throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wrapper-aware injector
+// ---------------------------------------------------------------------------
+
+/**
+ * Sentinel used by `WrapperAwareInjector` to distinguish "token not found"
+ * from a legitimate `undefined`/`null` provider value.
+ */
+const _WRAPPER_NOT_FOUND = {};
+
+/**
+ * Creates an injector that merges a field's resolved injector with the wrapper
+ * chain's slot injector. Token lookups check the field injector first (preserving
+ * `FIELD_SIGNAL_CONTEXT`, `ARRAY_CONTEXT`, etc.), then fall back to the slot
+ * injector (whose element injector hierarchy includes wrapper component instances).
+ *
+ * This enables cross-field wrapper DI: a wrapper on a child field can
+ * `inject(ParentWrapper)` when that wrapper wraps an ancestor field's chain.
+ */
+export function createWrapperAwareInjector(fieldInjector: Injector, wrapperSlotInjector: Injector): Injector {
+  if (fieldInjector === wrapperSlotInjector) return fieldInjector;
+  return new WrapperAwareInjector(fieldInjector, wrapperSlotInjector);
+}
+
+class WrapperAwareInjector extends Injector {
+  constructor(
+    private readonly fieldInjector: Injector,
+    private readonly wrapperSlotInjector: Injector,
+  ) {
+    super();
+  }
+
+  override get(token: ProviderToken<unknown>, notFoundValue?: unknown, flags?: unknown): unknown {
+    const result = this.fieldInjector.get(token, _WRAPPER_NOT_FOUND, flags as never);
+    if (result !== _WRAPPER_NOT_FOUND) return result;
+    return this.wrapperSlotInjector.get(token, notFoundValue, flags as never);
   }
 }

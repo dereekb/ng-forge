@@ -15,7 +15,7 @@ import { explicitEffect } from 'ngxtension/explicit-effect';
 import { ResolvedField } from '../utils/resolve-field/resolve-field';
 import { WRAPPER_AUTO_ASSOCIATIONS } from '../models/wrapper-type';
 import { DEFAULT_WRAPPERS } from '../models/field-signal-context.token';
-import { setInputIfDeclared } from '../utils/wrapper-chain/wrapper-chain';
+import { createWrapperAwareInjector, setInputIfDeclared } from '../utils/wrapper-chain/wrapper-chain';
 import { createWrapperChainController } from '../utils/wrapper-chain/wrapper-chain-controller';
 import { isSameWrapperChain, resolveWrappers } from '../utils/resolve-wrappers/resolve-wrappers';
 import { READONLY_FIELD_TREE_CACHE, toReadonlyFieldTreeCached } from '../core/field-tree-utils';
@@ -139,7 +139,7 @@ export class DfFieldOutlet {
         this.fieldRef?.destroy();
         this.fieldRef = slot.createComponent(resolved.component, {
           environmentInjector: this.fieldEnvInjector(),
-          injector: resolved.injector,
+          injector: createWrapperAwareInjector(resolved.injector, slot.injector),
         });
         this.fieldSlot = slot;
         // Reset per-field push cache so a shared `key` value is still pushed.

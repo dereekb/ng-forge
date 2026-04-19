@@ -15,6 +15,7 @@ import { firstValueFrom } from 'rxjs';
 import { FieldWrapperContract, WrapperConfig, WrapperTypeDefinition } from '../../models/wrapper-type';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import { hasDefaultExport, loadWrapperComponents, renderWrapperChain, resolveDefaultExport, setInputIfDeclared } from './wrapper-chain';
+import { FIELD_SIGNAL_CONTEXT } from '../../models/field-signal-context.token';
 
 /** No-op logger for tests that don't assert on log output. */
 function silentLogger(): Logger {
@@ -47,6 +48,16 @@ class TestWrapperA implements FieldWrapperContract {
 })
 class TestWrapperB implements FieldWrapperContract {
   readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
+}
+
+@Component({
+  selector: 'test-wrapper-b-nested',
+  template: `<div data-wrapper="b"><ng-container #fieldComponent></ng-container></div>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class TestWrapperBNested implements FieldWrapperContract {
+  readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
+  readonly parent = inject(TestWrapperB);
 }
 
 /** Wrapper whose #fieldComponent sits inside an @if — viewChild.required throws. */
@@ -230,6 +241,32 @@ describe('wrapper-chain', () => {
 
       expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("'broken'"));
       expect(innermost).not.toHaveBeenCalled();
+    });
+
+    it('provides parent wrapper instances to nested wrappers via element injector', () => {
+      const innermost = vi.fn();
+      const refs = renderWrapperChain({
+        outerContainer: host.slot(),
+        loadedWrappers: [
+          { config: { type: 'b' } as WrapperConfig, component: TestWrapperB },
+          { config: { type: 'b-nested' } as WrapperConfig, component: TestWrapperBNested },
+        ],
+        environmentInjector: envInjector,
+        parentInjector: envInjector,
+        logger: silentLogger(),
+        renderInnermost: innermost,
+      });
+
+      expect(refs).toHaveLength(2);
+      expect(refs[0].componentType).toBe(TestWrapperB);
+      expect(refs[1].componentType).toBe(TestWrapperBNested);
+
+      // TestWrapperBNested injects TestWrapperB — the element injector chain
+      // from the inner VCR must include the outer wrapper's component instance.
+      const nested = refs[1].instance as TestWrapperBNested;
+      expect(nested.parent).toBeInstanceOf(TestWrapperB);
+      expect(nested.parent).toBe(refs[0].instance);
+      expect(innermost).toHaveBeenCalledTimes(1);
     });
 
     it('vcr.clear() on the outer container cascades destroy through every wrapper ref', () => {

@@ -113,6 +113,8 @@ export class DfFieldOutlet {
   private readonly defaultEnvInjector = inject(EnvironmentInjector);
   /** Environment injector for the innermost field component — `[environmentInjector]` input takes precedence over the directive's own DI. */
   private readonly fieldEnvInjector = computed(() => this.dfFieldOutletEnvironmentInjector() ?? this.defaultEnvInjector);
+  /** Field-level injector — gives wrappers access to tokens like ARRAY_CONTEXT. */
+  private readonly fieldInjector = computed(() => this.dfFieldOutlet().injector);
 
   constructor() {
     createWrapperChainController({
@@ -121,6 +123,7 @@ export class DfFieldOutlet {
       gate: this.renderReady,
       rebuildKey: this.componentIdentity,
       fieldInputs: this.fieldInputs,
+      fieldInjector: this.fieldInjector,
       beforeRebuild: () => this.detachFieldRef(),
       renderInnermost: (slot) => {
         const resolved = this.dfFieldOutlet();

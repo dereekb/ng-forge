@@ -8,6 +8,8 @@ import { FIELD_REGISTRY, FieldTypeDefinition } from './models/field-type';
 import { checkboxFieldMapper, valueFieldMapper } from '@ng-forge/dynamic-forms/integration';
 import { BUILT_IN_FIELDS, BUILT_IN_WRAPPERS } from './providers/built-in-fields';
 import { FieldWrapperContract, WRAPPER_REGISTRY, WrapperTypeDefinition } from './models/wrapper-type';
+import { ARRAY_CONTEXT } from './models/field-signal-context.token';
+import { ArrayContext } from './mappers/types';
 import { BaseCheckedField, BaseValueField } from './definitions';
 import { ChangeDetectionStrategy, Component, DebugElement, inject, input, viewChild, ViewContainerRef } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
@@ -26,6 +28,7 @@ type TestFormConfig = {
     | { type: 'group'; key: string; label: string; fields: any[] }
     | { type: 'page'; key: string; label?: string; fields: any[] }
     | { type: 'container'; key: string; fields: any[]; wrappers: any[] }
+    | { type: 'array'; key: string; fields: any[] }
   >;
 };
 
@@ -64,6 +67,18 @@ class TestChildWrapperComponent implements FieldWrapperContract {
   readonly parent = inject(TestParentWrapperComponent);
 }
 
+@Component({
+  selector: 'test-array-ctx-wrapper',
+  template: `<div data-wrapper="array-ctx" [attr.data-array-key]="arrayContext?.arrayKey ?? 'none'">
+    <ng-container #fieldComponent></ng-container>
+  </div>`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+class TestArrayContextWrapperComponent implements FieldWrapperContract {
+  readonly fieldComponent = viewChild.required('fieldComponent', { read: ViewContainerRef });
+  readonly arrayContext = inject(ARRAY_CONTEXT, { optional: true }) as ArrayContext | null;
+}
+
 const TEST_WRAPPER_TYPES: WrapperTypeDefinition[] = [
   {
     wrapperName: 'test-parent',
@@ -72,6 +87,10 @@ const TEST_WRAPPER_TYPES: WrapperTypeDefinition[] = [
   {
     wrapperName: 'test-child',
     loadComponent: () => Promise.resolve({ default: TestChildWrapperComponent }),
+  },
+  {
+    wrapperName: 'test-array-ctx',
+    loadComponent: () => Promise.resolve({ default: TestArrayContextWrapperComponent }),
   },
 ];
 
@@ -104,6 +123,7 @@ describe('DynamicFormComponent', () => {
         TestCheckboxHarnessComponent,
         TestParentWrapperComponent,
         TestChildWrapperComponent,
+        TestArrayContextWrapperComponent,
       ],
       providers: [
         {
@@ -2445,6 +2465,33 @@ describe('DynamicFormComponent', () => {
       expect(childEl.getAttribute('data-has-parent')).toBe('true');
       // Child wrapper should be nested inside the parent wrapper's DOM
       expect(parentEl.contains(childEl)).toBe(true);
+    });
+
+    it('should provide ARRAY_CONTEXT to wrappers on fields inside an array', async () => {
+      const config = {
+        fields: [
+          {
+            type: 'array',
+            key: 'items',
+            fields: [
+              {
+                key: 'itemContainer',
+                type: 'container',
+                fields: [{ key: 'name', type: 'input', label: 'Name' }],
+                wrappers: [{ type: 'test-array-ctx' }],
+              },
+            ],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { fixture } = createComponent(config, { items: [{}] });
+      await waitForDynamicComponents(fixture);
+
+      const wrapperEl = fixture.nativeElement.querySelector('[data-wrapper="array-ctx"]');
+      expect(wrapperEl).toBeTruthy();
+      // The wrapper should have received ARRAY_CONTEXT with the parent array's key
+      expect(wrapperEl.getAttribute('data-array-key')).toBe('items');
     });
   });
 

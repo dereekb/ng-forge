@@ -137,6 +137,14 @@ export interface RenderWrapperChainOptions {
    * not a single field).
    */
   readonly fieldInputs?: WrapperFieldInputs;
+  /**
+   * Optional field-level injector (e.g. from `ResolvedField.injector`). When
+   * provided, each wrapper component receives a merged injector that checks
+   * this injector first — giving wrappers access to field-specific tokens like
+   * `ARRAY_CONTEXT` and `FIELD_SIGNAL_CONTEXT` — then falls back to the
+   * element injector chain for parent wrapper resolution.
+   */
+  readonly fieldInjector?: Injector;
   /** Renders whatever belongs at the innermost slot (a field component, a children template, …). */
   readonly renderInnermost: (slot: ViewContainerRef) => void;
 }
@@ -171,9 +179,11 @@ function renderStep(
 
   const [wrapper, ...rest] = remaining;
 
+  const wrapperInjector = options.fieldInjector ? createWrapperAwareInjector(options.fieldInjector, slot.injector) : slot.injector;
+
   const ref = slot.createComponent(wrapper.component, {
     environmentInjector: options.environmentInjector,
-    injector: slot.injector,
+    injector: wrapperInjector,
   });
   refs.push(ref);
 

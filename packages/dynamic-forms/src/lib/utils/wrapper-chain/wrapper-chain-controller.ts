@@ -41,6 +41,13 @@ export interface WrapperChainControllerOptions {
    */
   readonly rebuildKey?: Signal<unknown>;
   /**
+   * Optional field-level injector signal (e.g. `ResolvedField.injector`).
+   * When provided, wrapper components receive a merged injector that includes
+   * field-specific tokens (`ARRAY_CONTEXT`, `FIELD_SIGNAL_CONTEXT`) alongside
+   * the element injector chain. Containers omit this.
+   */
+  readonly fieldInjector?: Signal<Injector>;
+  /**
    * Renders whatever belongs at the innermost slot (a field component, a children
    * template, …). Called each time the chain mounts or structurally rebuilds.
    */
@@ -204,6 +211,7 @@ function applyEmission({ state, loaded }: ChainEmission, ctx: EmissionApplyConte
     parentInjector: deps.parentInjector,
     logger: deps.logger,
     fieldInputs: opts.fieldInputs?.(),
+    fieldInjector: opts.fieldInjector?.(),
     renderInnermost: opts.renderInnermost,
   });
   mounted.value = { wrappers: state.wrappers, rebuildKey: state.rebuildKey };

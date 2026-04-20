@@ -641,4 +641,67 @@ test.describe('Array Fields E2E Tests', () => {
       await expect(inputs).toHaveCount(3, { timeout: 5000 });
     });
   });
+
+  test.describe('Array Move Operations', () => {
+    test('should reorder items without destroying them', async ({ page }) => {
+      await page.goto('/#/testing/array-fields/array-move');
+      await page.waitForLoadState('networkidle');
+
+      const scenario = page.locator('[data-testid="array-move"]');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      // Should have three initial items
+      const inputs = scenario.locator('#items input');
+      await expect(inputs).toHaveCount(3, { timeout: 10000 });
+
+      // Verify initial order
+      await expect(inputs.nth(0)).toHaveValue('Alpha', { timeout: 5000 });
+      await expect(inputs.nth(1)).toHaveValue('Beta', { timeout: 5000 });
+      await expect(inputs.nth(2)).toHaveValue('Gamma', { timeout: 5000 });
+
+      // Capture initial item IDs to verify identity preservation
+      const initialIds = await scenario
+        .locator('.df-array-item')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('data-array-item-id')));
+      expect(initialIds).toHaveLength(3);
+
+      // Move first item to last position
+      const moveFirstToLast = scenario.locator('[data-testid="move-first-to-last"]');
+      await moveFirstToLast.click();
+
+      // Wait for values to settle
+      await expect(inputs.nth(0)).toHaveValue('Beta', { timeout: 5000 });
+      await expect(inputs.nth(1)).toHaveValue('Gamma', { timeout: 5000 });
+      await expect(inputs.nth(2)).toHaveValue('Alpha', { timeout: 5000 });
+
+      // Verify item IDs were reordered (same IDs, different positions = no destroy/recreate)
+      const movedIds = await scenario
+        .locator('.df-array-item')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('data-array-item-id')));
+      expect(movedIds).toHaveLength(3);
+      expect(movedIds[0]).toBe(initialIds[1]); // Beta's ID moved to position 0
+      expect(movedIds[1]).toBe(initialIds[2]); // Gamma's ID moved to position 1
+      expect(movedIds[2]).toBe(initialIds[0]); // Alpha's ID moved to position 2
+    });
+
+    test('should support moving last to first', async ({ page }) => {
+      await page.goto('/#/testing/array-fields/array-move');
+      await page.waitForLoadState('networkidle');
+
+      const scenario = page.locator('[data-testid="array-move"]');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const inputs = scenario.locator('#items input');
+      await expect(inputs).toHaveCount(3, { timeout: 10000 });
+
+      // Move last item to first position
+      const moveLastToFirst = scenario.locator('[data-testid="move-last-to-first"]');
+      await moveLastToFirst.click();
+
+      // Verify new order: Gamma, Alpha, Beta
+      await expect(inputs.nth(0)).toHaveValue('Gamma', { timeout: 5000 });
+      await expect(inputs.nth(1)).toHaveValue('Alpha', { timeout: 5000 });
+      await expect(inputs.nth(2)).toHaveValue('Beta', { timeout: 5000 });
+    });
+  });
 });

@@ -8,9 +8,9 @@ const config = {
       key: 'items',
       type: 'array',
       fields: [
-        [{ key: 'value', type: 'input', label: 'Value', value: 'Alpha' }],
-        [{ key: 'value', type: 'input', label: 'Value', value: 'Beta' }],
-        [{ key: 'value', type: 'input', label: 'Value', value: 'Gamma' }],
+        [{ key: 'value', type: 'input', label: 'Name', value: 'Alpha' }],
+        [{ key: 'value', type: 'input', label: 'Email', value: 'Beta' }],
+        [{ key: 'value', type: 'input', label: 'Phone', value: 'Gamma' }],
       ],
     },
   ],
@@ -33,6 +33,8 @@ const config = {
         <div class="move-buttons">
           <button data-testid="move-first-to-last" (click)="moveFirstToLast()">Move First to Last</button>
           <button data-testid="move-last-to-first" (click)="moveLastToFirst()">Move Last to First</button>
+          <button data-testid="remove-last" (click)="removeLast()">Remove Last</button>
+          <button data-testid="add-item" (click)="addItem()">Add Item</button>
         </div>
         <details class="debug-output">
           <summary>Debug Output</summary>
@@ -54,5 +56,13 @@ export class ArrayMoveComponent {
 
   moveLastToFirst(): void {
     this.dispatcher.dispatch(arrayEvent('items').move(2, 0));
+  }
+
+  removeLast(): void {
+    this.dispatcher.dispatch(arrayEvent('items').pop());
+  }
+
+  addItem(): void {
+    this.dispatcher.dispatch(arrayEvent('items').append([{ key: 'value', type: 'input', label: 'Note', value: 'Delta' }]));
   }
 }

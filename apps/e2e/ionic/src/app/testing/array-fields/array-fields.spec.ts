@@ -703,5 +703,65 @@ test.describe('Array Fields E2E Tests', () => {
       await expect(inputs.nth(1)).toHaveValue('Alpha', { timeout: 5000 });
       await expect(inputs.nth(2)).toHaveValue('Beta', { timeout: 5000 });
     });
+
+    test('should preserve correct templates after move then remove (recreate)', async ({ page }) => {
+      await page.goto('/#/testing/array-fields/array-move');
+      await page.waitForLoadState('networkidle');
+
+      const scenario = page.locator('[data-testid="array-move"]');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const items = scenario.locator('.df-array-item');
+      const inputs = scenario.locator('#items input');
+      await expect(inputs).toHaveCount(3, { timeout: 10000 });
+
+      await expect(items.nth(0)).toContainText('Name', { timeout: 5000 });
+      await expect(items.nth(1)).toContainText('Email', { timeout: 5000 });
+      await expect(items.nth(2)).toContainText('Phone', { timeout: 5000 });
+
+      const moveFirstToLast = scenario.locator('[data-testid="move-first-to-last"]');
+      await moveFirstToLast.click();
+      await expect(inputs.nth(0)).toHaveValue('Beta', { timeout: 5000 });
+      await expect(inputs.nth(2)).toHaveValue('Alpha', { timeout: 5000 });
+
+      const removeLast = scenario.locator('[data-testid="remove-last"]');
+      await removeLast.click();
+      await expect(inputs).toHaveCount(2, { timeout: 10000 });
+
+      await expect(items.nth(0)).toContainText('Email', { timeout: 5000 });
+      await expect(items.nth(1)).toContainText('Phone', { timeout: 5000 });
+      await expect(inputs.nth(0)).toHaveValue('Beta', { timeout: 5000 });
+      await expect(inputs.nth(1)).toHaveValue('Gamma', { timeout: 5000 });
+    });
+
+    test('should move a dynamically added item and preserve its template', async ({ page }) => {
+      await page.goto('/#/testing/array-fields/array-move');
+      await page.waitForLoadState('networkidle');
+
+      const scenario = page.locator('[data-testid="array-move"]');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const items = scenario.locator('.df-array-item');
+      const inputs = scenario.locator('#items input');
+      await expect(inputs).toHaveCount(3, { timeout: 10000 });
+
+      const addItem = scenario.locator('[data-testid="add-item"]');
+      await addItem.click();
+      await expect(inputs).toHaveCount(4, { timeout: 10000 });
+      await expect(items.nth(3)).toContainText('Note', { timeout: 5000 });
+      await expect(inputs.nth(3)).toHaveValue('Delta', { timeout: 5000 });
+
+      const moveFirstToLast = scenario.locator('[data-testid="move-first-to-last"]');
+      await moveFirstToLast.click();
+
+      await expect(items.nth(0)).toContainText('Email', { timeout: 5000 });
+      await expect(items.nth(1)).toContainText('Phone', { timeout: 5000 });
+      await expect(items.nth(2)).toContainText('Name', { timeout: 5000 });
+      await expect(items.nth(3)).toContainText('Note', { timeout: 5000 });
+      await expect(inputs.nth(0)).toHaveValue('Beta', { timeout: 5000 });
+      await expect(inputs.nth(1)).toHaveValue('Gamma', { timeout: 5000 });
+      await expect(inputs.nth(2)).toHaveValue('Alpha', { timeout: 5000 });
+      await expect(inputs.nth(3)).toHaveValue('Delta', { timeout: 5000 });
+    });
   });
 });

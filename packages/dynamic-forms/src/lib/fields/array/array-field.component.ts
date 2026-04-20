@@ -458,15 +458,12 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
         void this.appendItems(fieldTrees, operation.startIndex, operation.endIndex, currentVersion);
         break;
       case 'recreate': {
-        // Before clearing, capture templates by position for items beyond defined templates.
-        // This allows dynamically added items to be recreated with their original templates.
-        const itemTemplates = this.itemTemplates();
-        const positionalTemplates: (FieldDef<unknown>[] | undefined)[] = resolvedItems.map((item, idx) => {
-          // For items within the defined templates range, use the config directly
-          if (idx < itemTemplates.length) {
-            return undefined; // Will use itemTemplates[idx] during resolve
-          }
-          // For dynamically added items, look up their stored template
+        // Capture templates by item ID so each item is recreated with its original template,
+        // even after move operations that change positions. Registry entries (from dynamic adds
+        // or moves) take priority over positional itemTemplates lookup.
+        const positionalTemplates: (FieldDef<unknown>[] | undefined)[] = resolvedItems.map((item) => {
+          // Registry entries (from dynamic adds or moves) take priority;
+          // unmoved initial items return undefined → falls through to itemTemplates[idx] during resolve.
           return this.templateRegistry.get(item.id);
         });
 
@@ -674,6 +671,21 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
     }
 
     if (fromIndex === toIndex) return;
+
+    // Register templates for all items whose position will change.
+    // Initial items use itemTemplates[currentIndex] during recreate, but after
+    // a move their position no longer matches their original template. Stashing
+    // the template by item ID lets the recreate path resolve the correct one.
+    const itemTemplates = this.itemTemplates();
+    const currentItems = this.resolvedItemsSignal();
+    const lo = Math.min(fromIndex, toIndex);
+    const hi = Math.max(fromIndex, toIndex);
+    for (let i = lo; i <= hi; i++) {
+      const item = currentItems[i];
+      if (item && !this.templateRegistry.has(item.id) && i < itemTemplates.length) {
+        this.templateRegistry.set(item.id, itemTemplates[i] as FieldDef<unknown>[]);
+      }
+    }
 
     // Reorder resolvedItems — splice preserves object identity (no destroy/recreate)
     this.resolvedItemsSignal.update((current) => {

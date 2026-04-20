@@ -21,7 +21,7 @@ const config = {
  * Dispatches move events via EventDispatcher to reorder array items.
  */
 @Component({
-  selector: 'example-array-move',
+  selector: 'bs-example-array-move',
   imports: [DynamicForm, JsonPipe],
   providers: [EventDispatcher],
   changeDetection: ChangeDetectionStrategy.OnPush,

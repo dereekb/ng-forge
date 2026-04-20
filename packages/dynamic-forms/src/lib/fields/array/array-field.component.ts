@@ -157,6 +157,23 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
   });
 
   /**
+   * Normalized item templates WITHOUT auto-remove button appended.
+   * Each element is normalized to an array: single FieldDef → [FieldDef], array stays as-is.
+   *
+   * Used by moveItem() to stash raw templates into the templateRegistry, preserving
+   * the invariant that registry entries are pre-synthesis (withAutoRemove() adds the
+   * button during resolution).
+   */
+  private readonly rawItemTemplates = computed<ArrayItemTemplate[]>(() => {
+    const arrayField = this.field();
+    const definitions = (arrayField.fields as ArrayItemDefinition[]) || [];
+
+    return definitions.map((def) => {
+      return (Array.isArray(def) ? def : [def]) as ArrayItemTemplate;
+    });
+  });
+
+  /**
    * Gets the item templates (field definitions) for the array.
    * Each element can be either:
    * - A single FieldDef (primitive item) - normalized to [FieldDef]
@@ -169,18 +186,13 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
    * Returns normalized templates where all items are arrays for consistent handling.
    */
   private readonly itemTemplates = computed<ArrayItemTemplate[]>(() => {
-    const arrayField = this.field();
-    const definitions = (arrayField.fields as ArrayItemDefinition[]) || [];
+    const raw = this.rawItemTemplates();
     const removeButton = this.autoRemoveButton();
 
-    // Normalize: single FieldDef → [FieldDef], array stays as-is
-    // Append auto-remove button if configured (for primitive simplified arrays)
-    return definitions.map((def) => {
-      const normalized = (Array.isArray(def) ? def : [def]) as ArrayItemTemplate;
-      if (removeButton) {
-        return [...normalized, removeButton] as unknown as ArrayItemTemplate;
-      }
-      return normalized;
+    if (!removeButton) return raw;
+
+    return raw.map((normalized) => {
+      return [...normalized, removeButton] as unknown as ArrayItemTemplate;
     });
   });
 
@@ -672,18 +684,21 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
 
     if (fromIndex === toIndex) return;
 
-    // Register templates for all items whose position will change.
+    // Register raw (pre-auto-remove) templates for all items whose position will change.
     // Initial items use itemTemplates[currentIndex] during recreate, but after
     // a move their position no longer matches their original template. Stashing
     // the template by item ID lets the recreate path resolve the correct one.
-    const itemTemplates = this.itemTemplates();
+    // We use rawItemTemplates (without auto-remove button) because the recreate path
+    // calls withAutoRemove() during resolution — storing the synthesized version would
+    // cause duplicate remove buttons.
+    const rawTemplates = this.rawItemTemplates();
     const currentItems = this.resolvedItemsSignal();
     const lo = Math.min(fromIndex, toIndex);
     const hi = Math.max(fromIndex, toIndex);
     for (let i = lo; i <= hi; i++) {
       const item = currentItems[i];
-      if (item && !this.templateRegistry.has(item.id) && i < itemTemplates.length) {
-        this.templateRegistry.set(item.id, itemTemplates[i] as FieldDef<unknown>[]);
+      if (item && !this.templateRegistry.has(item.id) && i < rawTemplates.length) {
+        this.templateRegistry.set(item.id, rawTemplates[i] as FieldDef<unknown>[]);
       }
     }
 

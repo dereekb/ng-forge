@@ -27,6 +27,8 @@ import { FunctionRegistryService } from '../../core/registry/function-registry.s
 import { RootFormRegistryService } from '../../core/registry/root-form-registry.service';
 import { getFieldDefaultValue } from '../../utils/default-value/default-value';
 import { createPropertyOverrideStore, PROPERTY_OVERRIDE_STORE } from '../../core/property-derivation/property-override-store';
+import { setNormalizedArrayMetadata } from '../../utils/array-field/normalized-array-metadata';
+import { FieldDef } from '../../definitions/base/field-def';
 
 /**
  * Polls until the component's resolvedItems count satisfies the predicate.
@@ -1243,6 +1245,65 @@ describe('ArrayFieldComponent', () => {
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Dynamic Forms]'), expect.stringContaining('out of bounds'));
 
       consoleSpy.mockRestore();
+    });
+
+    it('should not duplicate auto-remove buttons after move + recreate', async () => {
+      // Build an array field with auto-remove metadata (simulates a simplified array).
+      // Using 'test' type for the remove button since the test registry only has 'test'.
+      const autoRemoveButton: FieldDef<unknown> = { key: '__remove', type: 'test', label: 'Remove' };
+
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [
+          [createSimpleTestField('item', 'Item', 'alpha')],
+          [createSimpleTestField('item', 'Item', 'beta')],
+          [createSimpleTestField('item', 'Item', 'gamma')],
+        ],
+      };
+
+      // Attach auto-remove metadata — this is what normalizeSimplifiedArrays does
+      setNormalizedArrayMetadata(field as unknown as Record<string | symbol, unknown>, {
+        autoRemoveButton,
+      });
+
+      const { component, fixture } = setupArrayTest(field, {
+        items: [{ item: 'alpha' }, { item: 'beta' }, { item: 'gamma' }],
+      });
+      const eventBus = TestBed.inject(EventBus);
+      const context = TestBed.inject(FIELD_SIGNAL_CONTEXT) as FieldSignalContext<Record<string, unknown>>;
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      // Verify initial items each have exactly one '__remove' field (from auto-remove)
+      for (const item of component.resolvedItems()) {
+        const removeFields = item.fields.filter((f) => f.key === '__remove');
+        expect(removeFields).toHaveLength(1);
+      }
+
+      // Move first item to last — this stashes templates in the registry
+      eventBus.dispatch(MoveArrayItemEvent, 'items', 0, 2);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.resolvedItems()).toHaveLength(3);
+
+      // Trigger a recreate by setting the value to a shorter array from outside.
+      // The differential update sees resolvedItems.length (3) > fieldTrees.length (2) → 'recreate'.
+      // Recreate reads templates from the registry and calls withAutoRemove() on them.
+      // Before the fix, the registry stored itemTemplates (already containing the remove button),
+      // so withAutoRemove() would append a second one → duplicate remove buttons.
+      context.value.set({ items: [{ item: 'beta' }, { item: 'gamma' }] });
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      await waitForItems(component, fixture, (n) => n === 2);
+
+      // Each recreated item should have exactly one '__remove' field, not two
+      for (const item of component.resolvedItems()) {
+        const removeFields = item.fields.filter((f) => f.key === '__remove');
+        expect(removeFields).toHaveLength(1);
+      }
     });
   });
 });

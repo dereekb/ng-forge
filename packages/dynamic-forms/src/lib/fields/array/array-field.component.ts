@@ -301,6 +301,8 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
             return;
           }
           void this.handleAddFromEvent(action.template, action.index);
+        } else if (action.action === 'move') {
+          this.moveItem(action.fromIndex, action.toIndex);
         } else {
           this.removeItem(action.index);
         }
@@ -640,6 +642,54 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
     cached = [...templates, removeButton];
     this.autoRemoveCache.set(templates, cached);
     return cached;
+  }
+
+  /**
+   * Handles move operations — reorders an existing item without destroying it.
+   * Updates resolvedItems and form value atomically. Since the array length
+   * doesn't change, `determineDifferentialOperation` returns 'none' and no
+   * recreate is triggered. The `@for` loop tracks by `item.id`, so Angular
+   * moves the DOM node instead of destroying/recreating. The `itemPositionMap`
+   * computed auto-recomputes, propagating new indices to child linkedSignals.
+   */
+  private moveItem(fromIndex: number, toIndex: number): void {
+    const arrayKey = this.field().key;
+    const parentForm = this.parentFieldSignalContext.form;
+    const currentValue = parentForm().value() as TModel;
+    const currentArray = getArrayValue(currentValue as Partial<TModel>, arrayKey);
+    const length = currentArray.length;
+
+    if (fromIndex < 0 || fromIndex >= length) {
+      this.logger.warn(
+        `moveArrayItem fromIndex ${fromIndex} is out of bounds for array '${arrayKey}' with length ${length}. Operation skipped.`,
+      );
+      return;
+    }
+
+    if (toIndex < 0 || toIndex >= length) {
+      this.logger.warn(
+        `moveArrayItem toIndex ${toIndex} is out of bounds for array '${arrayKey}' with length ${length}. Operation skipped.`,
+      );
+      return;
+    }
+
+    if (fromIndex === toIndex) return;
+
+    // Reorder resolvedItems — splice preserves object identity (no destroy/recreate)
+    this.resolvedItemsSignal.update((current) => {
+      const newItems = [...current];
+      const [moved] = newItems.splice(fromIndex, 1);
+      newItems.splice(toIndex, 0, moved);
+      return newItems;
+    });
+
+    // Reorder form value array the same way
+    const newArray = [...currentArray];
+    const [movedValue] = newArray.splice(fromIndex, 1);
+    newArray.splice(toIndex, 0, movedValue);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    parentForm().value.set({ ...currentValue, [arrayKey]: newArray } as any);
   }
 
   /**

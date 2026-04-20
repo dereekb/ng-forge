@@ -13,7 +13,14 @@ import { withLoggerConfig } from '../../providers/features/logger/with-logger-co
 import { FIELD_REGISTRY } from '../../models/field-type';
 import { FieldTypeDefinition } from '../../models/field-type';
 import { DEFAULT_PROPS, DEFAULT_VALIDATION_MESSAGES, FIELD_SIGNAL_CONTEXT, FORM_OPTIONS } from '../../models/field-signal-context.token';
-import { AppendArrayItemEvent, EventBus, InsertArrayItemEvent, PopArrayItemEvent, RemoveAtIndexEvent } from '../../events';
+import {
+  AppendArrayItemEvent,
+  EventBus,
+  InsertArrayItemEvent,
+  MoveArrayItemEvent,
+  PopArrayItemEvent,
+  RemoveAtIndexEvent,
+} from '../../events';
 import { createSchemaFromFields } from '../../core/schema-builder';
 import { vi } from 'vitest';
 import { FunctionRegistryService } from '../../core/registry/function-registry.service';
@@ -1075,6 +1082,160 @@ describe('ArrayFieldComponent', () => {
       await waitForItems(component, fixture, (n) => n >= 1);
 
       eventBus.dispatch(RemoveAtIndexEvent, 'items', 99);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.resolvedItems()).toHaveLength(1);
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Dynamic Forms]'), expect.stringContaining('out of bounds'));
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('MoveArrayItemEvent', () => {
+    it('should reorder items and form values when move event is dispatched', async () => {
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [
+          [createSimpleTestField('item', 'Item', 'first')],
+          [createSimpleTestField('item', 'Item', 'second')],
+          [createSimpleTestField('item', 'Item', 'third')],
+        ],
+      };
+
+      const { component, fixture } = setupArrayTest(field);
+      const eventBus = TestBed.inject(EventBus);
+      const context = TestBed.inject(FIELD_SIGNAL_CONTEXT) as FieldSignalContext<Record<string, unknown>>;
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+      const originalIds = component.resolvedItems().map((item) => item.id);
+      expect(component.resolvedItems()).toHaveLength(3);
+
+      // Move first item to last position
+      eventBus.dispatch(MoveArrayItemEvent, 'items', 0, 2);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Item count should remain the same
+      expect(component.resolvedItems()).toHaveLength(3);
+
+      // IDs should be reordered, not regenerated (same objects, no destroy)
+      const newIds = component.resolvedItems().map((item) => item.id);
+      expect(newIds[0]).toBe(originalIds[1]);
+      expect(newIds[1]).toBe(originalIds[2]);
+      expect(newIds[2]).toBe(originalIds[0]);
+
+      // Form value should reflect the reorder
+      const formValue = context.value();
+      const items = formValue['items'] as unknown[];
+      expect(items).toHaveLength(3);
+      expect(items[0]).toMatchObject({ item: 'second' });
+      expect(items[1]).toMatchObject({ item: 'third' });
+      expect(items[2]).toMatchObject({ item: 'first' });
+    });
+
+    it('should preserve item identity (no destroy/recreate)', async () => {
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [
+          [createSimpleTestField('item', 'Item', 'a')],
+          [createSimpleTestField('item', 'Item', 'b')],
+          [createSimpleTestField('item', 'Item', 'c')],
+        ],
+      };
+
+      const { component, fixture } = setupArrayTest(field);
+      const eventBus = TestBed.inject(EventBus);
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      // Capture original item references
+      const originalItems = component.resolvedItems();
+      const originalItem0 = originalItems[0];
+      const originalItem1 = originalItems[1];
+      const originalItem2 = originalItems[2];
+
+      // Move item at index 2 to index 0
+      eventBus.dispatch(MoveArrayItemEvent, 'items', 2, 0);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const movedItems = component.resolvedItems();
+
+      // Same object references — items were reordered, not recreated
+      expect(movedItems[0]).toBe(originalItem2);
+      expect(movedItems[1]).toBe(originalItem0);
+      expect(movedItems[2]).toBe(originalItem1);
+    });
+
+    it('should no-op when fromIndex equals toIndex', async () => {
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [[createSimpleTestField('item', 'Item', 'first')], [createSimpleTestField('item', 'Item', 'second')]],
+      };
+
+      const { component, fixture } = setupArrayTest(field);
+      const eventBus = TestBed.inject(EventBus);
+      const context = TestBed.inject(FIELD_SIGNAL_CONTEXT) as FieldSignalContext<Record<string, unknown>>;
+
+      await waitForItems(component, fixture, (n) => n >= 2);
+      const originalIds = component.resolvedItems().map((item) => item.id);
+
+      eventBus.dispatch(MoveArrayItemEvent, 'items', 1, 1);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Nothing should change
+      const newIds = component.resolvedItems().map((item) => item.id);
+      expect(newIds).toEqual(originalIds);
+
+      const items = context.value()['items'] as unknown[];
+      expect(items[0]).toMatchObject({ item: 'first' });
+      expect(items[1]).toMatchObject({ item: 'second' });
+    });
+
+    it('should warn and skip when fromIndex is out of bounds', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [[createSimpleTestField('item', 'Item', 'first')]],
+      };
+      const { component, fixture } = setupArrayTest(field, { items: ['a'] });
+      const eventBus = TestBed.inject(EventBus);
+
+      await waitForItems(component, fixture, (n) => n >= 1);
+
+      eventBus.dispatch(MoveArrayItemEvent, 'items', 5, 0);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.resolvedItems()).toHaveLength(1);
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Dynamic Forms]'), expect.stringContaining('out of bounds'));
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should warn and skip when toIndex is out of bounds', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [[createSimpleTestField('item', 'Item', 'first')]],
+      };
+      const { component, fixture } = setupArrayTest(field, { items: ['a'] });
+      const eventBus = TestBed.inject(EventBus);
+
+      await waitForItems(component, fixture, (n) => n >= 1);
+
+      eventBus.dispatch(MoveArrayItemEvent, 'items', 0, 5);
       await fixture.whenStable();
       fixture.detectChanges();
 

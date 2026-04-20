@@ -1,6 +1,7 @@
 import { AppendArrayItemEvent, ArrayItemDefinitionTemplate } from './constants/append-array-item.event';
 import { PrependArrayItemEvent } from './constants/prepend-array-item.event';
 import { InsertArrayItemEvent } from './constants/insert-array-item.event';
+import { MoveArrayItemEvent } from './constants/move-array-item.event';
 import { PopArrayItemEvent } from './constants/pop-array-item.event';
 import { ShiftArrayItemEvent } from './constants/shift-array-item.event';
 import { RemoveAtIndexEvent } from './constants/remove-at-index.event';
@@ -155,5 +156,22 @@ export function arrayEvent(arrayKey: string) {
      * ```
      */
     removeAt: (index: number) => new RemoveAtIndexEvent(arrayKey, index),
+
+    /**
+     * Move an existing item from one position to another within the array.
+     * This is an atomic reorder — the item is NOT destroyed and recreated.
+     * The resolved component, form value, and stored template are preserved.
+     *
+     * @param from - The current index of the item to move
+     * @param to - The target index to move the item to
+     * @returns A MoveArrayItemEvent to dispatch
+     *
+     * @example
+     * ```typescript
+     * // Move item from index 0 to index 2
+     * eventBus.dispatch(arrayEvent('contacts').move(0, 2));
+     * ```
+     */
+    move: (from: number, to: number) => new MoveArrayItemEvent(arrayKey, from, to),
   };
 }

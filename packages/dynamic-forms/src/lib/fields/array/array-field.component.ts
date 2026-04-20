@@ -41,7 +41,7 @@ import { getNormalizedArrayMetadata } from '../../utils/array-field/normalized-a
 /**
  * Container component for rendering dynamic arrays of fields.
  *
- * Supports add/remove operations via the arrayEvent() builder API.
+ * Supports add/remove/move operations via the arrayEvent() builder API.
  * Uses differential updates to optimize rendering - only recreates items when necessary.
  * Each item gets a scoped injector with ARRAY_CONTEXT for position-aware operations.
  * Supports multiple sibling fields per array item (e.g., name + email without a wrapper).

@@ -37,10 +37,13 @@ import { RemoveAtIndexEvent } from './constants/remove-at-index.event';
  * eventBus.dispatch(arrayEvent('contacts').pop());      // Remove last
  * eventBus.dispatch(arrayEvent('contacts').shift());    // Remove first
  * eventBus.dispatch(arrayEvent('contacts').removeAt(2)); // Remove at index
+ *
+ * // Reordering items (no template needed, preserves item identity)
+ * eventBus.dispatch(arrayEvent('contacts').move(0, 2)); // Move first to third
  * ```
  *
  * @param arrayKey - The key of the array field to operate on
- * @returns An object with methods for all 6 array operations
+ * @returns An object with methods for all 7 array operations
  */
 export function arrayEvent(arrayKey: string) {
   return {

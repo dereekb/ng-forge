@@ -135,7 +135,8 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
    * Detection order:
    * 1. Normalization metadata (for simplified arrays — always available at normalization time)
    * 2. Existing item definitions (non-empty full-API arrays)
-   * 3. Dynamically discovered key from handleAddFromEvent (empty full-API arrays)
+   * 3. Single-field restoreTemplate (full-API arrays restored from external values)
+   * 4. Dynamically discovered key from handleAddFromEvent (empty full-API arrays)
    *
    * Uses linkedSignal: recomputes when field() changes, supports manual set()
    * for the dynamic discovery case.
@@ -151,6 +152,17 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
     const definitions = (this.field().fields as ArrayItemDefinition[]) || [];
     if (definitions.length > 0 && !Array.isArray(definitions[0])) {
       return (definitions[0] as FieldDef<unknown>).key;
+    }
+
+    // Priority 3: Single-field restoreTemplate (full-API arrays restored from external values).
+    // Mirrors handleAddFromEvent's primitive detection — a single non-flatten FieldDef is a
+    // primitive item, so its key wraps the FormControl in the item context.
+    const restoreTemplate = this.field().restoreTemplate ?? metadata?.restoreTemplate;
+    if (restoreTemplate && !Array.isArray(restoreTemplate)) {
+      const template = restoreTemplate as FieldDef<unknown>;
+      if (getFieldValueHandling(template.type, this.rawFieldRegistry()) !== 'flatten') {
+        return template.key;
+      }
     }
 
     return undefined;

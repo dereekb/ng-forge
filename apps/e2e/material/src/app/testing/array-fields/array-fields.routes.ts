@@ -195,6 +195,11 @@ const routes: Routes = [
     path: 'array-event-dispatcher',
     loadComponent: () => import('./array-event-dispatcher.component').then((m) => m.ArrayEventDispatcherComponent),
   },
+  // Array move (reorder without destroy)
+  {
+    path: 'array-move',
+    loadComponent: () => import('./array-move.component').then((m) => m.ArrayMoveComponent),
+  },
 ];
 
 export default routes;

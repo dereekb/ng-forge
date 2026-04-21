@@ -1,35 +1,29 @@
 {
-  "name": "@ng-forge/dynamic-forms",
+  "name": "@ng-forge/dynamic-forms-material",
   "version": "0.7.0-dist-2",
-  "description": "Type-safe, signal-powered dynamic forms for Angular. Build complex forms from configuration with full TypeScript inference.",
+  "description": "Angular Material integration for @ng-forge/dynamic-forms. Pre-built Material Design form components.",
   "type": "module",
   "license": "MIT",
   "author": "ng-forge",
-  "homepage": "https://ng-forge.com/dynamic-forms",
+  "homepage": "https://ng-forge.com/dynamic-forms/ui-libs-integrations/material",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ng-forge/ng-forge.git",
-    "directory": "packages/dynamic-forms"
+    "directory": "packages/dynamic-forms-material"
   },
   "bugs": {
     "url": "https://github.com/ng-forge/ng-forge/issues"
   },
   "keywords": [
     "angular",
+    "angular-material",
+    "material-design",
     "forms",
     "dynamic-forms",
-    "reactive-forms",
-    "signal-forms",
     "form-builder",
-    "form-generator",
-    "type-safe",
-    "typescript",
-    "angular-forms",
-    "schema-forms",
-    "json-forms",
-    "config-driven"
+    "ng-forge"
   ],
-  "sideEffects": false,
+  "sideEffects": true,
   "engines": {
     "node": ">=20"
   },
@@ -37,30 +31,22 @@
     "@angular/common": "~21.2.0",
     "@angular/core": "~21.2.0",
     "@angular/forms": "~21.2.0",
-    "@standard-schema/spec": "^1.0.0",
+    "@angular/material": "~21.2.0",
+    "@ng-forge/dynamic-forms": "~0.7.0",
     "rxjs": ">=7.0.0"
   },
-  "dependencies": {
-    "ngxtension": ">=4.0.0",
-    "tslib": "^2.3.0"
-  },
-  "module": "fesm2022/ng-forge-dynamic-forms.mjs",
-  "typings": "types/ng-forge-dynamic-forms.d.ts",
+  "module": "fesm2022/ng-forge-dynamic-forms-material.mjs",
+  "typings": "types/ng-forge-dynamic-forms-material.d.ts",
   "exports": {
     "./package.json": {
       "default": "./package.json"
     },
     ".": {
-      "types": "./types/ng-forge-dynamic-forms.d.ts",
-      "default": "./fesm2022/ng-forge-dynamic-forms.mjs"
-    },
-    "./integration": {
-      "types": "./types/ng-forge-dynamic-forms-integration.d.ts",
-      "default": "./fesm2022/ng-forge-dynamic-forms-integration.mjs"
-    },
-    "./schema": {
-      "types": "./types/ng-forge-dynamic-forms-schema.d.ts",
-      "default": "./fesm2022/ng-forge-dynamic-forms-schema.mjs"
+      "types": "./types/ng-forge-dynamic-forms-material.d.ts",
+      "default": "./fesm2022/ng-forge-dynamic-forms-material.mjs"
     }
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
   }
 }

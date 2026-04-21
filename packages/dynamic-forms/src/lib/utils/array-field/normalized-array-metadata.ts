@@ -1,4 +1,5 @@
 import { FieldDef } from '../../definitions/base/field-def';
+import { ArrayAllowedChildren } from '../../models/types/nesting-constraints';
 
 /**
  * Metadata attached to normalized array fields during simplified array expansion.
@@ -20,6 +21,13 @@ export interface NormalizedArrayMetadata {
    * Stored during normalization so the array component doesn't need dynamic discovery.
    */
   readonly primitiveFieldKey?: string;
+  /**
+   * Copied from `SimplifiedArrayField.template` during normalization. Used as the
+   * fallback template for any array item present in the form value that was not
+   * added through the event handlers and is not covered by a positional entry in
+   * `fields` — e.g., items introduced by external form-value updates.
+   */
+  readonly restoreTemplate?: ArrayAllowedChildren | readonly ArrayAllowedChildren[];
 }
 
 /**

@@ -1,5 +1,6 @@
 import { ArrayFieldComponent } from './array-field.component';
 import { ArrayField } from '../../definitions/default/array-field';
+import { normalizeSimplifiedArrays } from '../../utils/array-field/normalize-simplified-arrays';
 import { RowField } from '../../definitions/default/row-field';
 import { delay } from '@ng-forge/utils';
 import { createSimpleTestField, TestFieldComponent } from '../../../../testing/src/simple-test-utils';
@@ -1304,6 +1305,80 @@ describe('ArrayFieldComponent', () => {
         const removeFields = item.fields.filter((f) => f.key === '__remove');
         expect(removeFields).toHaveLength(1);
       }
+    });
+  });
+
+  describe('restoreTemplate', () => {
+    it('should resolve untracked items using restoreTemplate on a fields:[] array', async () => {
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [],
+        restoreTemplate: createSimpleTestField('item', 'Item'),
+      };
+
+      const { component, fixture } = setupArrayTest(field, { items: ['a', 'b', 'c'] });
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      expect(component.resolvedItems()).toHaveLength(3);
+    });
+
+    it('should resolve items past the defined fields using restoreTemplate', async () => {
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [[createSimpleTestField('item', 'Item', 'first')]],
+        restoreTemplate: [createSimpleTestField('item', 'Item')],
+      };
+
+      const { component, fixture } = setupArrayTest(field, { items: ['first', 'second', 'third'] });
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      expect(component.resolvedItems()).toHaveLength(3);
+    });
+
+    it('should warn and drop items when no restoreTemplate is configured', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn');
+
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [],
+      };
+
+      const { component, fixture } = setupArrayTest(field, { items: ['a'] });
+
+      await fixture.whenStable();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      await delay(50);
+
+      expect(component.resolvedItems()).toHaveLength(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[Dynamic Forms]'),
+        expect.stringContaining('No template found for array item'),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should resolve items from SimplifiedArrayField.template via normalization metadata', async () => {
+      const [normalized] = normalizeSimplifiedArrays([
+        {
+          key: 'items',
+          type: 'array',
+          template: { key: 'item', type: 'test', label: 'Item' },
+          value: ['a'],
+        } as unknown as import('../../definitions/base/field-def').FieldDef<unknown>,
+      ]);
+
+      const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a', 'b', 'c'] });
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      expect(component.resolvedItems()).toHaveLength(3);
     });
   });
 });

@@ -766,4 +766,70 @@ describe('normalizeSimplifiedArrays', () => {
       expect(result[3].type).toBe('input');
     });
   });
+
+  describe('restoreTemplate in metadata', () => {
+    it('should stash the primitive template into metadata.restoreTemplate', () => {
+      const input = fields({
+        key: 'tags',
+        type: 'array',
+        template: primitiveTemplate,
+        value: ['angular'],
+      });
+
+      const result = normalizeSimplifiedArrays(input);
+      const arrayField = result[0] as Record<string, unknown>;
+
+      const metadata = getNormalizedArrayMetadata(arrayField);
+      expect(metadata).toBeDefined();
+      expect(metadata!.restoreTemplate).toBe(primitiveTemplate);
+    });
+
+    it('should stash the object template into metadata.restoreTemplate', () => {
+      const input = fields({
+        key: 'contacts',
+        type: 'array',
+        template: objectTemplate,
+        value: [{ name: 'Jane', phone: '555' }],
+      });
+
+      const result = normalizeSimplifiedArrays(input);
+      const arrayField = result[0] as Record<string, unknown>;
+
+      const metadata = getNormalizedArrayMetadata(arrayField);
+      expect(metadata).toBeDefined();
+      expect(metadata!.restoreTemplate).toBe(objectTemplate);
+    });
+
+    it('should populate restoreTemplate even when no values are provided', () => {
+      const input = fields({
+        key: 'tags',
+        type: 'array',
+        template: primitiveTemplate,
+      });
+
+      const result = normalizeSimplifiedArrays(input);
+      const arrayField = result[0] as Record<string, unknown>;
+
+      const metadata = getNormalizedArrayMetadata(arrayField);
+      expect(metadata).toBeDefined();
+      expect(metadata!.restoreTemplate).toBe(primitiveTemplate);
+    });
+
+    it('should populate restoreTemplate when removeButton is disabled (no autoRemove)', () => {
+      const input = fields({
+        key: 'tags',
+        type: 'array',
+        template: objectTemplate,
+        removeButton: false,
+      });
+
+      const result = normalizeSimplifiedArrays(input);
+      const arrayField = result[0] as Record<string, unknown>;
+
+      const metadata = getNormalizedArrayMetadata(arrayField);
+      expect(metadata).toBeDefined();
+      expect(metadata!.autoRemoveButton).toBeUndefined();
+      expect(metadata!.restoreTemplate).toBe(objectTemplate);
+    });
+  });
 });

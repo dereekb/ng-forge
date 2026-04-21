@@ -161,14 +161,15 @@ function expandSimplifiedArray(field: SimplifiedArrayField): ExpandedArray {
   // Safe cast: we're constructing a valid ArrayField shape with key, type, and fields
   const arrayField = arrayFieldObj as unknown as FieldDef<unknown>;
 
-  // Store normalization metadata via Symbol property instead of a runtime property
+  // Store normalization metadata via Symbol property instead of a runtime property.
+  // `restoreTemplate` always gets populated from the simplified `template` so the array
+  // component can resolve untracked items (e.g., from external form-value updates).
   const primitiveFieldKey = !isObjectTemplate ? (template as ArrayAllowedChildren).key : undefined;
-  if (hasAutoRemove || primitiveFieldKey) {
-    setNormalizedArrayMetadata(arrayFieldObj, {
-      ...(hasAutoRemove && { autoRemoveButton: buildRemoveButton(removeButton) }),
-      ...(primitiveFieldKey && { primitiveFieldKey }),
-    });
-  }
+  setNormalizedArrayMetadata(arrayFieldObj, {
+    ...(hasAutoRemove && { autoRemoveButton: buildRemoveButton(removeButton) }),
+    ...(primitiveFieldKey && { primitiveFieldKey }),
+    restoreTemplate: template,
+  });
 
   // Construct the add button (sibling, placed after the array)
   let addButtonField: FieldDef<unknown> | undefined;

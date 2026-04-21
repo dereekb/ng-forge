@@ -434,7 +434,7 @@ export const FIELD_TYPES: FieldTypeInfo[] = [
     type: 'array',
     category: 'container',
     description:
-      'Repeatable field group for dynamic lists/arrays. Arrays do NOT have a label property. Use "fields" (not "template") to define the item template. Supports only \'hidden\' logic type for conditional visibility. Supports minLength/maxLength for array size validation. Each array item is rendered inside a `<div class="df-array-item">` wrapper with `role="group"`, `aria-label="Item N"` (1-based), `data-array-item-id`, and `data-array-item-index` attributes for styling, accessibility, and testing.',
+      'Repeatable field group for dynamic lists/arrays. Arrays do NOT have a label property. Use "fields" (not "template") to define the item template. Supports only \'hidden\' logic type for conditional visibility. Supports minLength/maxLength for array size validation. Optional `restoreTemplate` provides a fallback item template for homogeneous arrays when the form value contains untracked items (e.g., external value.set or parent two-way binding). Each array item is rendered inside a `<div class="df-array-item">` wrapper with `role="group"`, `aria-label="Item N"` (1-based), `data-array-item-id`, and `data-array-item-index` attributes for styling, accessibility, and testing.',
     valueType: 'T[]',
     baseInterface: 'FieldDef',
     props: {
@@ -454,6 +454,13 @@ export const FIELD_TYPES: FieldTypeInfo[] = [
         name: 'maxLength',
         type: 'number',
         description: 'Maximum number of items allowed in the array. Validation fails if more items.',
+        required: false,
+      },
+      restoreTemplate: {
+        name: 'restoreTemplate',
+        type: 'ArrayAllowedChildren | readonly ArrayAllowedChildren[]',
+        description:
+          'Fallback template used for any array item present in the form value that was not added via the event handlers and is not covered by a positional entry in `fields`. Triggered whenever the form value carries untracked items — direct `value.set` calls, parent two-way binding reassignment, or initial values on a `fields: []` array. Homogeneous arrays only — every restored item receives this same template. Matches SimplifiedArrayField.template: single field = primitive item, array of fields = object item.',
         required: false,
       },
     },

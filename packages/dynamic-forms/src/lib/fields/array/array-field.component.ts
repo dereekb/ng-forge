@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { DfFieldOutlet } from '../../directives/df-field-outlet.directive';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, firstValueFrom, forkJoin, map, Observable, of } from 'rxjs';
+import { catchError, firstValueFrom, forkJoin, map, Observable, of, tap } from 'rxjs';
 import { explicitEffect } from 'ngxtension/explicit-effect';
 import { ArrayField, ArrayItemDefinition, ArrayItemTemplate } from '../../definitions/default/array-field';
 import { isGroupField } from '../../definitions/default/group-field';
@@ -171,6 +171,29 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
     return definitions.map((def) => {
       return (Array.isArray(def) ? def : [def]) as ArrayItemTemplate;
     });
+  });
+
+  /**
+   * Resolves the effective restore template for this array — the fallback used when
+   * the form value contains an item with no registered template (i.e., items that
+   * were neither added via event handlers nor covered by a positional entry in `fields`).
+   *
+   * Precedence:
+   * 1. Author-supplied `restoreTemplate` on the full `ArrayField`.
+   * 2. Normalization metadata — populated from `SimplifiedArrayField.template`
+   *    so every simplified array gets an automatic default.
+   *
+   * Returns undefined when neither is configured; `createResolveItemObservable` then
+   * falls back to warn-and-drop, preserving today's behavior for full-API arrays
+   * that don't opt in.
+   *
+   * Homogeneous arrays only — all restored items receive the same template.
+   */
+  private readonly restoreTemplate = computed<FieldDef<unknown>[] | undefined>(() => {
+    const metadata = getNormalizedArrayMetadata(this.field());
+    const raw = this.field().restoreTemplate ?? metadata?.restoreTemplate;
+    if (!raw) return undefined;
+    return (Array.isArray(raw) ? [...raw] : [raw]) as FieldDef<unknown>[];
   });
 
   /**
@@ -580,7 +603,11 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
    * Template resolution order:
    * 1. Use overrideTemplate if provided (from recreate with stored templates)
    * 2. Use itemTemplates[index] if within defined templates range
-   * 3. Return undefined (item cannot be resolved without a template)
+   * 3. Use restoreTemplate for untracked items present in the form value
+   *    (e.g., external `value.set`, parent two-way binding, initial values on a
+   *    `fields: []` array). Registers the resolved item in templateRegistry so
+   *    subsequent recreates use the fast Priority 1 path.
+   * 4. Return undefined (item cannot be resolved without a template)
    */
   private createResolveItemObservable(index: number, overrideTemplate?: FieldDef<unknown>[]): Observable<ResolvedArrayItem | undefined> {
     const itemTemplates = this.itemTemplates();
@@ -621,11 +648,37 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
       });
     }
 
-    // No template available - this shouldn't happen in normal operation.
-    // Dynamically added items should always have their template stored in the registry.
+    // Priority 3: Use restoreTemplate fallback for untracked items in the form value.
+    // Homogeneous only — every restored item receives the same template regardless of value shape.
+    const restore = this.restoreTemplate();
+    if (restore && restore.length > 0) {
+      return resolveArrayItem({
+        index,
+        templates: this.withAutoRemove(restore),
+        arrayField: this.field(),
+        itemPositionMap: this.itemPositionMap,
+        parentFieldSignalContext: this.parentFieldSignalContext,
+        parentInjector: this.parentInjector,
+        registry: this.rawFieldRegistry(),
+        destroyRef: this.destroyRef,
+        loadTypeComponent: (type: string) => this.fieldRegistry.loadTypeComponent(type),
+        generateItemId: this.generateItemId,
+        primitiveFieldKey: primitiveKey,
+      }).pipe(
+        tap((item) => {
+          // Register restored template against the generated item id so subsequent
+          // recreates hit Priority 1 instead of re-resolving via this branch.
+          if (item) this.templateRegistry.set(item.id, restore);
+        }),
+      );
+    }
+
+    // Priority 4: no template available. For full-API arrays without restoreTemplate,
+    // this is the intended signal that an untracked item cannot be rendered.
     this.logger.warn(
       `No template found for array item at index ${index}. ` +
-        'This may indicate a bug - dynamically added items should have their templates stored.',
+        'Add a restoreTemplate on the ArrayField (or use the simplified array API) ' +
+        'to resolve items introduced by external form-value updates.',
     );
     return of(undefined);
   }

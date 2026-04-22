@@ -91,6 +91,7 @@ describe('MatRadioField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From RadioField
     | 'options';
 
@@ -173,8 +174,8 @@ describe('MatRadioField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is generic type', () => {
-      expectTypeOf<MatRadioField<string>['value']>().toEqualTypeOf<string | undefined>();
-      expectTypeOf<MatRadioField<number>['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<MatRadioField<string>['value']>().toEqualTypeOf<string | null | undefined>();
+      expectTypeOf<MatRadioField<number>['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {

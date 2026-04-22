@@ -3,6 +3,7 @@ import { BaseFieldDefSchema } from '../../../src/lib/schemas/field/field-def.sch
 import { FieldWithValidationSchema } from '../../../src/lib/schemas/field/field-with-validation.schema';
 import { DynamicTextSchema } from '../../../src/lib/schemas/common/dynamic-text.schema';
 import { MatDatepickerPropsSchema } from '../props/mat-datepicker-props.schema';
+import { nullableValueRefine } from '../../../src/lib/schemas/field/nullable-value.refinement';
 
 /**
  * Schema for date values - can be ISO string or Date serialization.
@@ -27,16 +28,24 @@ export const DateValueSchema = z.union([z.string(), z.null()]);
  *
  * Note: In JSON configs, Date values are represented as ISO 8601 strings.
  */
-export const MatDatepickerFieldSchema = BaseFieldDefSchema.merge(FieldWithValidationSchema).extend({
+/**
+ * Raw ZodObject. Used internally by `MatLeafFieldSchema`'s `z.discriminatedUnion`,
+ * which rejects `ZodEffects`. The cross-field nullable contract (`value: null`
+ * requires `nullable: true`) is enforced on the public `MatDatepickerFieldSchema` export
+ * below via `.superRefine(nullableValueRefine)`, and redundantly at the
+ * union level. Direct parse on this raw schema is not a public API.
+ */
+const MatDatepickerFieldSchemaObject = BaseFieldDefSchema.merge(FieldWithValidationSchema).extend({
   /**
    * Field type discriminant.
    */
   type: z.literal('datepicker'),
 
+  nullable: z.boolean().optional(),
   /**
    * Initial date value (ISO string in JSON configs).
    */
-  value: DateValueSchema.optional(),
+  value: DateValueSchema.nullable().optional(),
 
   /**
    * Minimum selectable date.
@@ -63,5 +72,13 @@ export const MatDatepickerFieldSchema = BaseFieldDefSchema.merge(FieldWithValida
    */
   props: MatDatepickerPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * `value: null` is only valid when `nullable: true`.
+ * The raw `MatDatepickerFieldSchemaObject` is used internally for discriminatedUnion composition.
+ */
+export const MatDatepickerFieldSchema = MatDatepickerFieldSchemaObject.superRefine(nullableValueRefine);
+export { MatDatepickerFieldSchemaObject };
 
 export type MatDatepickerFieldSchemaType = z.infer<typeof MatDatepickerFieldSchema>;

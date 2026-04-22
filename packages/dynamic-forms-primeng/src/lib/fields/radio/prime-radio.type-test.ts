@@ -86,6 +86,7 @@ describe('PrimeRadioField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From RadioField
     | 'options';
 
@@ -168,8 +169,8 @@ describe('PrimeRadioField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is of generic type', () => {
-      expectTypeOf<PrimeRadioField<string>['value']>().toEqualTypeOf<string | undefined>();
-      expectTypeOf<PrimeRadioField<number>['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<PrimeRadioField<string>['value']>().toEqualTypeOf<string | null | undefined>();
+      expectTypeOf<PrimeRadioField<number>['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {
@@ -216,6 +217,6 @@ describe('PrimeRadioField - Usage', () => {
       value: 2,
     };
 
-    expectTypeOf(field.value).toEqualTypeOf<number | undefined>();
+    expectTypeOf(field.value).toEqualTypeOf<number | null | undefined>();
   });
 });

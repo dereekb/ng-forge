@@ -103,6 +103,7 @@ describe('PrimeDatepickerField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From DatepickerField
     | 'minDate'
     | 'maxDate'
@@ -183,7 +184,7 @@ describe('PrimeDatepickerField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is Date or string', () => {
-      expectTypeOf<PrimeDatepickerField['value']>().toEqualTypeOf<Date | string | undefined>();
+      expectTypeOf<PrimeDatepickerField['value']>().toEqualTypeOf<Date | string | null | undefined>();
     });
 
     it('placeholder', () => {

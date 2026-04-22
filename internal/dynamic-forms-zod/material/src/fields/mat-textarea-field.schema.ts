@@ -3,6 +3,7 @@ import { BaseFieldDefSchema } from '../../../src/lib/schemas/field/field-def.sch
 import { FieldWithValidationSchema } from '../../../src/lib/schemas/field/field-with-validation.schema';
 import { DynamicTextSchema } from '../../../src/lib/schemas/common/dynamic-text.schema';
 import { MatTextareaPropsSchema } from '../props/mat-textarea-props.schema';
+import { nullableValueRefine } from '../../../src/lib/schemas/field/nullable-value.refinement';
 
 /**
  * Schema for Material textarea field.
@@ -16,16 +17,24 @@ import { MatTextareaPropsSchema } from '../props/mat-textarea-props.schema';
  * }
  * ```
  */
-export const MatTextareaFieldSchema = BaseFieldDefSchema.merge(FieldWithValidationSchema).extend({
+/**
+ * Raw ZodObject. Used internally by `MatLeafFieldSchema`'s `z.discriminatedUnion`,
+ * which rejects `ZodEffects`. The cross-field nullable contract (`value: null`
+ * requires `nullable: true`) is enforced on the public `MatTextareaFieldSchema` export
+ * below via `.superRefine(nullableValueRefine)`, and redundantly at the
+ * union level. Direct parse on this raw schema is not a public API.
+ */
+const MatTextareaFieldSchemaObject = BaseFieldDefSchema.merge(FieldWithValidationSchema).extend({
   /**
    * Field type discriminant.
    */
   type: z.literal('textarea'),
 
+  nullable: z.boolean().optional(),
   /**
    * Initial value for the textarea.
    */
-  value: z.string().optional(),
+  value: z.string().nullable().optional(),
 
   /**
    * Placeholder text (can also be in props).
@@ -37,5 +46,13 @@ export const MatTextareaFieldSchema = BaseFieldDefSchema.merge(FieldWithValidati
    */
   props: MatTextareaPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * `value: null` is only valid when `nullable: true`.
+ * The raw `MatTextareaFieldSchemaObject` is used internally for discriminatedUnion composition.
+ */
+export const MatTextareaFieldSchema = MatTextareaFieldSchemaObject.superRefine(nullableValueRefine);
+export { MatTextareaFieldSchemaObject };
 
 export type MatTextareaFieldSchemaType = z.infer<typeof MatTextareaFieldSchema>;

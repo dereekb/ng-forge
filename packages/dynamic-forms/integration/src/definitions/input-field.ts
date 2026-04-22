@@ -106,10 +106,11 @@ export type StringInputType<T extends HtmlInputType = InputType> = Exclude<T, 'n
  * When props.type is 'number', value must be number.
  * Props is REQUIRED and must include type: 'number'.
  */
-interface NumberInputField<TProps extends { type?: string } = InputProps> extends BaseValueField<
+interface NumberInputField<TProps extends { type?: string } = InputProps, TNullable extends boolean = boolean> extends BaseValueField<
   TProps & { type: 'number' },
   number,
-  InputMeta
+  InputMeta,
+  TNullable
 > {
   type: 'input';
   props: TProps & { type: 'number' }; // Required with type: 'number'
@@ -120,10 +121,11 @@ interface NumberInputField<TProps extends { type?: string } = InputProps> extend
  * When props.type is text/email/etc (or undefined), value must be string.
  * Props type cannot be 'number'.
  */
-interface StringInputField<TProps extends { type?: string } = InputProps> extends BaseValueField<
+interface StringInputField<TProps extends { type?: string } = InputProps, TNullable extends boolean = boolean> extends BaseValueField<
   TProps & { type?: Exclude<TProps['type'], 'number'> },
   string,
-  InputMeta
+  InputMeta,
+  TNullable
 > {
   type: 'input';
   props?: TProps & { type?: Exclude<TProps['type'], 'number'> }; // Optional, but type cannot be 'number'
@@ -134,7 +136,9 @@ interface StringInputField<TProps extends { type?: string } = InputProps> extend
  * - If props.type is 'number', only NumberInputField matches (value: number)
  * - If props.type is undefined/text/email/etc, only StringInputField matches (value: string)
  */
-type BuildInputFieldUnion<TProps extends { type?: string }> = NumberInputField<TProps> | StringInputField<TProps>;
+type BuildInputFieldUnion<TProps extends { type?: string }, TNullable extends boolean = boolean> =
+  | NumberInputField<TProps, TNullable>
+  | StringInputField<TProps, TNullable>;
 
 /**
  * Input field with automatic type-safe value inference.
@@ -164,4 +168,7 @@ type BuildInputFieldUnion<TProps extends { type?: string }> = NumberInputField<T
  * }
  * type MatInputField = InputField<MatInputProps>; // Automatically gets discriminated union
  */
-export type InputField<TProps extends { type?: string } = InputProps> = BuildInputFieldUnion<TProps>;
+export type InputField<TProps extends { type?: string } = InputProps, TNullable extends boolean = boolean> = BuildInputFieldUnion<
+  TProps,
+  TNullable
+>;

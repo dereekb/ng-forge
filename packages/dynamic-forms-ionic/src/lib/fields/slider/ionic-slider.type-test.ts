@@ -121,6 +121,7 @@ describe('IonicSliderField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From SliderField
     | 'minValue'
     | 'maxValue'
@@ -225,7 +226,7 @@ describe('IonicSliderField - Exhaustive Whitelist', () => {
 
   describe('value field keys from BaseValueField', () => {
     it('value is number', () => {
-      expectTypeOf<IonicSliderField['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<IonicSliderField['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {

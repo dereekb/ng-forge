@@ -1,4 +1,4 @@
-import { BaseValueField } from '@ng-forge/dynamic-forms';
+import { BaseValueField, FieldMeta } from '@ng-forge/dynamic-forms';
 
 /**
  * Base props for datepicker fields. Intentionally empty — adapter libraries
@@ -6,7 +6,12 @@ import { BaseValueField } from '@ng-forge/dynamic-forms';
  */
 export type DatepickerProps = object;
 
-export interface DatepickerField<TProps> extends BaseValueField<TProps, Date | string> {
+export interface DatepickerField<TProps, TNullable extends boolean = boolean> extends BaseValueField<
+  TProps,
+  Date | string,
+  FieldMeta,
+  TNullable
+> {
   type: 'datepicker';
   minDate?: Date | string | null;
   maxDate?: Date | string | null;

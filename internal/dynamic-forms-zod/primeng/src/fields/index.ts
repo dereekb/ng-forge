@@ -16,16 +16,40 @@ import {
   PrimeTogglePropsSchema,
   PrimeButtonPropsSchema,
 } from '../props';
+import { nullableValueRefine } from '../../../src/lib/schemas/field/nullable-value.refinement';
 
 const PrimeValueFieldBase = BaseFieldDefSchema.merge(FieldWithValidationSchema);
 
 // Input field
-export const PrimeInputFieldSchema = PrimeValueFieldBase.extend({
+/*
+ * For each value-bearing field schema below we follow a dual-export pattern:
+ *
+ *   const Xxx...FieldSchemaObject = base.extend({ ... });   // raw ZodObject
+ *   export const Xxx...FieldSchema =
+ *     Xxx...FieldSchemaObject.superRefine(nullableValueRefine);   // public, refined
+ *
+ * The raw object is required because z.discriminatedUnion in the leaf schema
+ * rejects ZodEffects; the refined version enforces the cross-field contract
+ * (`value: null` requires `nullable: true`) on direct parse. The union applies
+ * `.superRefine(nullableValueRefine)` at its top level too, so the refinement
+ * runs for full-config validation regardless of which entry point is used.
+ */
+
+const PrimeInputFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('input'),
-  value: z.string().optional(),
+  nullable: z.boolean().optional(),
+  value: z.string().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   props: PrimeInputPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeInputFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeInputFieldSchema = PrimeInputFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeInputFieldSchemaObject };
 
 // Checkbox field
 export const PrimeCheckboxFieldSchema = PrimeValueFieldBase.extend({
@@ -36,35 +60,63 @@ export const PrimeCheckboxFieldSchema = PrimeValueFieldBase.extend({
 });
 
 // Radio field
-export const PrimeRadioFieldSchema = PrimeValueFieldBase.extend({
+const PrimeRadioFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('radio'),
-  value: z.unknown().optional(),
+  nullable: z.boolean().optional(),
+  value: z.unknown().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   options: FieldOptionsSchema,
   props: PrimeRadioPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeRadioFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeRadioFieldSchema = PrimeRadioFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeRadioFieldSchemaObject };
+
 // Select field
-export const PrimeSelectFieldSchema = PrimeValueFieldBase.extend({
+const PrimeSelectFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('select'),
-  value: z.unknown().optional(),
+  nullable: z.boolean().optional(),
+  value: z.unknown().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   options: FieldOptionsSchema,
   props: PrimeSelectPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeSelectFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeSelectFieldSchema = PrimeSelectFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeSelectFieldSchemaObject };
+
 // Multi-checkbox field
-export const PrimeMultiCheckboxFieldSchema = PrimeValueFieldBase.extend({
+const PrimeMultiCheckboxFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('multi-checkbox'),
-  value: z.array(z.unknown()).optional(),
+  nullable: z.boolean().optional(),
+  value: z.array(z.unknown()).nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   options: FieldOptionsSchema,
   props: PrimeMultiCheckboxPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeMultiCheckboxFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeMultiCheckboxFieldSchema = PrimeMultiCheckboxFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeMultiCheckboxFieldSchemaObject };
+
 // Datepicker field
-export const PrimeDatepickerFieldSchema = PrimeValueFieldBase.extend({
+const PrimeDatepickerFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('datepicker'),
+  nullable: z.boolean().optional(),
   value: z.union([z.string(), z.null()]).optional(),
   minDate: z.union([z.string(), z.null()]).optional(),
   maxDate: z.union([z.string(), z.null()]).optional(),
@@ -73,24 +125,50 @@ export const PrimeDatepickerFieldSchema = PrimeValueFieldBase.extend({
   props: PrimeDatepickerPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeDatepickerFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeDatepickerFieldSchema = PrimeDatepickerFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeDatepickerFieldSchemaObject };
+
 // Textarea field
-export const PrimeTextareaFieldSchema = PrimeValueFieldBase.extend({
+const PrimeTextareaFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('textarea'),
-  value: z.string().optional(),
+  nullable: z.boolean().optional(),
+  value: z.string().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   props: PrimeTextareaPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeTextareaFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeTextareaFieldSchema = PrimeTextareaFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeTextareaFieldSchemaObject };
+
 // Slider field
-export const PrimeSliderFieldSchema = PrimeValueFieldBase.extend({
+const PrimeSliderFieldSchemaObject = PrimeValueFieldBase.extend({
   type: z.literal('slider'),
-  value: z.number().optional(),
+  nullable: z.boolean().optional(),
+  value: z.number().nullable().optional(),
   minValue: z.number().optional(),
   maxValue: z.number().optional(),
   step: z.number().positive().optional(),
   placeholder: DynamicTextSchema.optional(),
   props: PrimeSliderPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`PrimeSliderFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const PrimeSliderFieldSchema = PrimeSliderFieldSchemaObject.superRefine(nullableValueRefine);
+export { PrimeSliderFieldSchemaObject };
 
 // Toggle field
 export const PrimeToggleFieldSchema = PrimeValueFieldBase.extend({

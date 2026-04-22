@@ -7,6 +7,14 @@ import { mapDiscriminator } from './discriminator-mapping.js';
 import { toLabel, toEnumLabel } from '../utils/naming.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Field types whose runtime `BaseValueField` accepts the `nullable` flag.
+ * Container types (group, array, row, page), checked fields (checkbox, toggle)
+ * and control/display fields do not support nullable in this release — the generator
+ * silently drops nullable:true for those with a verbose log.
+ */
+const NULLABLE_SUPPORTED_FIELD_TYPES = new Set(['input', 'textarea', 'select', 'radio', 'multi-checkbox', 'slider', 'datepicker']);
+
 function singularize(label: string): string {
   // Only strip trailing 's' if word is 4+ chars and doesn't end in 'ss'
   if (label.length >= 4 && label.endsWith('s') && !label.endsWith('ss')) {
@@ -25,6 +33,7 @@ export interface FieldConfig {
   type: string;
   label: string;
   value?: unknown;
+  nullable?: boolean;
   placeholder?: string;
   props?: Record<string, unknown>;
   options?: Array<{ label: string; value: string }>;
@@ -201,6 +210,26 @@ function mapPropertyToField(
     logger.verbose(`Field '${fieldPath}': disabled (readOnly in schema)`);
   }
 
+  // nullable detection covers three canonical OpenAPI / JSON Schema forms:
+  //   - 3.0: `nullable: true`
+  //   - 3.1: `type: [T, 'null']`
+  //   - 3.1 / JSON Schema: `oneOf` / `anyOf` with a `{ type: 'null' }` branch
+  // Only emit on value-bearing field types; checkbox/toggle (BaseCheckedField, tri-state
+  // deferred) and container/button/display types don't support the `nullable` flag.
+  const schemaObj = prop.schema as Record<string, unknown>;
+  const hasNullBranch = (variants: unknown): boolean =>
+    Array.isArray(variants) && (variants as Array<Record<string, unknown>>).some((v) => v && v['type'] === 'null');
+  const isNullable =
+    schemaObj['nullable'] === true ||
+    (Array.isArray(schemaObj['type']) && (schemaObj['type'] as unknown[]).includes('null')) ||
+    hasNullBranch(schemaObj['oneOf']) ||
+    hasNullBranch(schemaObj['anyOf']);
+  if (isNullable && NULLABLE_SUPPORTED_FIELD_TYPES.has(finalType)) {
+    field.nullable = true;
+  } else if (isNullable) {
+    logger.verbose(`Field '${fieldPath}': schema nullable ignored — '${finalType}' does not support the nullable flag in this release.`);
+  }
+
   // default → value
   if (prop.schema.default !== undefined) {
     field.value = prop.schema.default;
@@ -216,22 +245,28 @@ function mapPropertyToField(
     field.props = { ...field.props, hint: prop.schema.description };
   }
 
-  // Add enum options for select/radio/multi-checkbox
+  // Add enum options for select/radio/multi-checkbox.
+  // OpenAPI 3.1 allows `null` to appear in `enum` alongside `type: [T, 'null']` to signal
+  // nullability — it's NOT meant as a literal option. Filter it out here; nullability is
+  // expressed via `field.nullable = true` on the field.
   if (prop.schema.enum) {
-    // Support x-enum-labels extension for human-readable enum labels
-    const enumLabels = (prop.schema as Record<string, unknown>)['x-enum-labels'] as Record<string, string> | string[] | undefined;
-    field.options = prop.schema.enum.map((v: unknown, i: number) => {
-      const strVal = String(v);
-      let label: string;
-      if (Array.isArray(enumLabels) && enumLabels[i]) {
-        label = enumLabels[i];
-      } else if (enumLabels && !Array.isArray(enumLabels) && enumLabels[strVal]) {
-        label = enumLabels[strVal];
-      } else {
-        label = toEnumLabel(strVal);
-      }
-      return { label, value: strVal };
-    });
+    const filteredEnum = prop.schema.enum.filter((v: unknown) => v !== null);
+    if (filteredEnum.length > 0) {
+      // Support x-enum-labels extension for human-readable enum labels
+      const enumLabels = (prop.schema as Record<string, unknown>)['x-enum-labels'] as Record<string, string> | string[] | undefined;
+      field.options = filteredEnum.map((v: unknown, i: number) => {
+        const strVal = String(v);
+        let label: string;
+        if (Array.isArray(enumLabels) && enumLabels[i]) {
+          label = enumLabels[i];
+        } else if (enumLabels && !Array.isArray(enumLabels) && enumLabels[strVal]) {
+          label = enumLabels[strVal];
+        } else {
+          label = toEnumLabel(strVal);
+        }
+        return { label, value: strVal };
+      });
+    }
   }
 
   // Add validators
@@ -310,6 +345,13 @@ function mapPropertyToField(
             label: toEnumLabel(String(v)),
             value: String(v),
           }));
+        }
+        // Propagate item nullability onto the template (if the template field type supports it)
+        const itemsObj = items as Record<string, unknown>;
+        const itemsNullable =
+          itemsObj['nullable'] === true || (Array.isArray(itemsObj['type']) && (itemsObj['type'] as unknown[]).includes('null'));
+        if (itemsNullable && NULLABLE_SUPPORTED_FIELD_TYPES.has(templateField.type)) {
+          templateField.nullable = true;
         }
         field.template = templateField;
       }

@@ -91,19 +91,28 @@ export function getFieldDefaultValue(field: FieldDef<unknown>, registry: Map<str
     return groupDefaults;
   }
 
-  // Use explicit value if provided, with type-specific handling for null
+  // Narrow once: `field` is FieldDef<unknown>, but value/nullable are defined on BaseValueField.
+  // This cast avoids per-access `as` and documents what we're reading.
+  const valueField = field as FieldDef<unknown> & { value?: unknown; nullable?: boolean };
+  const isNullable = valueField.nullable === true;
+
+  // Use explicit value if provided (including null when nullable)
   if ('value' in field) {
-    // If value is explicitly set (even to null/undefined), respect it
-    if (field.value !== null && field.value !== undefined) {
-      return field.value;
+    if (valueField.value !== null && valueField.value !== undefined) {
+      return valueField.value;
     }
 
-    // Handle explicit null: use type-specific default
-    if (field.value === null) {
-      return field.type === 'checkbox' ? false : '';
+    // Preserve explicit null for nullable fields
+    if (valueField.value === null && isNullable) {
+      return null;
     }
 
-    // Handle explicit undefined: fall through to type-specific defaults
+    // Non-nullable null and undefined both fall through to type-specific defaults below
+  }
+
+  // Nullable fields with no explicit value default to null
+  if (isNullable) {
+    return null;
   }
 
   // Type-specific defaults when no value is specified

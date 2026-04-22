@@ -117,6 +117,7 @@ describe('MatSelectField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From SelectField
     | 'options';
 
@@ -199,8 +200,8 @@ describe('MatSelectField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is generic type', () => {
-      expectTypeOf<MatSelectField<string>['value']>().toEqualTypeOf<string | undefined>();
-      expectTypeOf<MatSelectField<number>['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<MatSelectField<string>['value']>().toEqualTypeOf<string | null | undefined>();
+      expectTypeOf<MatSelectField<number>['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {

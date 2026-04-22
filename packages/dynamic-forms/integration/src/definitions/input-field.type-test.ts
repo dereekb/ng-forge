@@ -395,3 +395,87 @@ describe('InputField - Usage Tests', () => {
     expectTypeOf(field.col).toEqualTypeOf<6>();
   });
 });
+
+// ============================================================================
+// InputField - Nullable widening
+// ============================================================================
+
+describe('InputField - Nullable widening', () => {
+  it('should accept value: null on nullable string input', () => {
+    const field = {
+      type: 'input',
+      key: 'name',
+      props: { type: 'text' },
+      nullable: true,
+      value: null,
+    } as const satisfies InputField<import('./input-field').InputProps, true>;
+
+    expectTypeOf(field.value).toEqualTypeOf<null>();
+    expectTypeOf(field.nullable).toEqualTypeOf<true>();
+  });
+
+  it('should accept value: null on nullable number input', () => {
+    const field = {
+      type: 'input',
+      key: 'age',
+      props: { type: 'number' },
+      nullable: true,
+      value: null,
+    } as const satisfies InputField<import('./input-field').InputProps, true>;
+
+    expectTypeOf(field.value).toEqualTypeOf<null>();
+  });
+
+  it('should accept a real string value when nullable is true', () => {
+    const field = {
+      type: 'input',
+      key: 'name',
+      props: { type: 'text' },
+      nullable: true,
+      value: 'hello',
+    } as const satisfies InputField<import('./input-field').InputProps, true>;
+
+    expectTypeOf(field.value).toEqualTypeOf<'hello'>();
+  });
+
+  it('should reject null value when nullable is explicitly false', () => {
+    // When the user pins nullable:false, the non-nullable branch is selected
+    // and `value: null` must not be assignable.
+    type NonNullableField = InputField<import('./input-field').InputProps, false>;
+    expectTypeOf<null>().not.toMatchTypeOf<NonNullableField['value']>();
+
+    // Literal assignment must be rejected at compile time.
+    // @ts-expect-error - null is not assignable to value when nullable: false
+    const field: InputField<import('./input-field').InputProps, false> = {
+      type: 'input',
+      key: 'name',
+      props: { type: 'text' },
+      value: null,
+    };
+    expectTypeOf(field).not.toBeAny();
+  });
+
+  it('should allow the inferred union form to accept both null and non-null values', () => {
+    // With the default TNullable = boolean, InputField distributes over
+    // both nullable variants. The default InputProps also allows props.type
+    // to be 'number', so the value union is string | number | null | undefined.
+    // Using toEqualTypeOf (not toMatchTypeOf) to catch accidental drops like
+    // `number` disappearing from the discriminated union.
+    type Inferred = InputField;
+    expectTypeOf<Inferred['value']>().toEqualTypeOf<string | number | null | undefined>();
+  });
+
+  it('should keep required orthogonal from nullable', () => {
+    const field = {
+      type: 'input',
+      key: 'name',
+      props: { type: 'text' },
+      nullable: true,
+      required: true,
+      value: null,
+    } as const satisfies InputField<import('./input-field').InputProps, true>;
+
+    expectTypeOf(field.required).toEqualTypeOf<true>();
+    expectTypeOf(field.nullable).toEqualTypeOf<true>();
+  });
+});

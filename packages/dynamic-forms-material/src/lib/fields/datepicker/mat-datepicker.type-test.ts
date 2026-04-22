@@ -113,6 +113,7 @@ describe('MatDatepickerField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From DatepickerField
     | 'minDate'
     | 'maxDate'
@@ -193,7 +194,7 @@ describe('MatDatepickerField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is Date or string', () => {
-      expectTypeOf<MatDatepickerField['value']>().toEqualTypeOf<Date | string | undefined>();
+      expectTypeOf<MatDatepickerField['value']>().toEqualTypeOf<Date | string | null | undefined>();
     });
 
     it('placeholder', () => {

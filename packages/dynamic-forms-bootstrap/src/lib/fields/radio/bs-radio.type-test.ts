@@ -94,6 +94,7 @@ describe('BsRadioField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From RadioField
     | 'options';
 
@@ -176,8 +177,8 @@ describe('BsRadioField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is generic type', () => {
-      expectTypeOf<BsRadioField<string>['value']>().toEqualTypeOf<string | undefined>();
-      expectTypeOf<BsRadioField<number>['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<BsRadioField<string>['value']>().toEqualTypeOf<string | null | undefined>();
+      expectTypeOf<BsRadioField<number>['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {

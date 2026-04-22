@@ -117,6 +117,7 @@ describe('BsDatepickerField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From DatepickerField
     | 'minDate'
     | 'maxDate'
@@ -197,7 +198,7 @@ describe('BsDatepickerField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is Date or string', () => {
-      expectTypeOf<BsDatepickerField['value']>().toEqualTypeOf<Date | string | undefined>();
+      expectTypeOf<BsDatepickerField['value']>().toEqualTypeOf<Date | string | null | undefined>();
     });
 
     it('placeholder', () => {

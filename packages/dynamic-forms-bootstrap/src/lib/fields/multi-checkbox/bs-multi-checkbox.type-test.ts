@@ -90,6 +90,7 @@ describe('BsMultiCheckboxField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From MultiCheckboxField
     | 'options';
 
@@ -172,8 +173,8 @@ describe('BsMultiCheckboxField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is array of generic type', () => {
-      expectTypeOf<BsMultiCheckboxField<string>['value']>().toEqualTypeOf<string[] | undefined>();
-      expectTypeOf<BsMultiCheckboxField<number>['value']>().toEqualTypeOf<number[] | undefined>();
+      expectTypeOf<BsMultiCheckboxField<string>['value']>().toEqualTypeOf<string[] | null | undefined>();
+      expectTypeOf<BsMultiCheckboxField<number>['value']>().toEqualTypeOf<number[] | null | undefined>();
     });
 
     it('placeholder', () => {
@@ -220,6 +221,6 @@ describe('BsMultiCheckboxField - Usage', () => {
       value: [1, 2],
     };
 
-    expectTypeOf(field.value).toEqualTypeOf<number[] | undefined>();
+    expectTypeOf(field.value).toEqualTypeOf<number[] | null | undefined>();
   });
 });

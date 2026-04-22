@@ -275,6 +275,194 @@ describe('mapSchemaToFields', () => {
     expect(result.fields[0].value).toBe('active');
   });
 
+  it('should map OpenAPI 3.0 nullable:true to nullable:true on field', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        note: { type: 'string', nullable: true } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBe(true);
+  });
+
+  it('should map OpenAPI 3.1 type:[T, null] to nullable:true on field', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        note: { type: ['string', 'null'] },
+      },
+    } as unknown as SchemaObject;
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBe(true);
+    // Downstream type mapping must still resolve the non-null type to a real field type
+    expect(result.fields[0].type).toBe('input');
+  });
+
+  it('should map OpenAPI 3.1 type:[number, null] to a numeric input field', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        age: { type: ['integer', 'null'] },
+      },
+    } as unknown as SchemaObject;
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBe(true);
+    expect(result.fields[0].type).toBe('input');
+    expect(result.fields[0].props?.['type']).toBe('number');
+  });
+
+  it('should preserve null as default value for nullable fields', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        note: { type: 'string', nullable: true, default: null } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBe(true);
+    expect(result.fields[0].value).toBeNull();
+  });
+
+  it('should omit nullable when schema does not declare it', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        note: { type: 'string' } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBeUndefined();
+  });
+
+  it('should NOT emit nullable on checkbox (boolean) fields — tri-state deferred', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        subscribed: { type: 'boolean', nullable: true } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].type).toBe('checkbox');
+    expect(result.fields[0].nullable).toBeUndefined();
+  });
+
+  it('should NOT emit nullable on container (group) fields', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        address: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            street: { type: 'string' },
+          },
+        } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].type).toBe('group');
+    expect(result.fields[0].nullable).toBeUndefined();
+  });
+
+  it('should NOT emit nullable on array container fields', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        tags: {
+          type: 'array',
+          nullable: true,
+          items: { type: 'string' },
+        } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].type).toBe('array');
+    expect(result.fields[0].nullable).toBeUndefined();
+  });
+
+  it('should propagate nullable onto array template when items are nullable', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        scores: {
+          type: 'array',
+          items: { type: 'integer', nullable: true },
+        } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].type).toBe('array');
+    const template = result.fields[0].template as { type: string; nullable?: boolean };
+    expect(template.nullable).toBe(true);
+  });
+
+  it('should NOT propagate nullable onto array template when item type does not support it (boolean items)', () => {
+    const schema: SchemaObject = {
+      type: 'object',
+      properties: {
+        flags: {
+          type: 'array',
+          items: { type: 'boolean', nullable: true },
+        } as unknown as SchemaObject,
+      },
+    };
+
+    const result = mapSchemaToFields(schema, []);
+    const template = result.fields[0].template as { type: string; nullable?: boolean };
+    expect(template.nullable).toBeUndefined();
+  });
+
+  it('should filter null out of select options when enum includes null (OpenAPI 3.1 nullable enum)', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        country: { type: ['string', 'null'], enum: ['US', 'UK', null] },
+      },
+    } as unknown as SchemaObject;
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].type).toBe('select');
+    expect(result.fields[0].nullable).toBe(true);
+    const options = result.fields[0].options!;
+    expect(options).toHaveLength(2);
+    expect(options.map((o) => o.value)).toEqual(['US', 'UK']);
+    expect(options.map((o) => o.label)).not.toContain('Null');
+  });
+
+  it('should detect nullable from oneOf with { type: "null" } branch', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        nick: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+      },
+    } as unknown as SchemaObject;
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBe(true);
+  });
+
+  it('should detect nullable from anyOf with { type: "null" } branch', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        count: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+      },
+    } as unknown as SchemaObject;
+
+    const result = mapSchemaToFields(schema, []);
+    expect(result.fields[0].nullable).toBe(true);
+  });
+
   it('should map description to props.hint', () => {
     const schema: SchemaObject = {
       type: 'object',

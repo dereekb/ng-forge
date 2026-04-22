@@ -11,8 +11,9 @@ import { DynamicText } from '../../models/types/dynamic-text';
  */
 export type ValueType = string | number | boolean | Date | object | unknown[];
 
-export interface BaseValueField<TProps, TValue, TMeta extends FieldMeta = FieldMeta> extends FieldDef<TProps, TMeta>, FieldWithValidation {
-  value?: TValue;
+export interface BaseValueField<TProps, TValue, TMeta extends FieldMeta = FieldMeta, TNullable extends boolean = false>
+  extends FieldDef<TProps, TMeta>, FieldWithValidation {
+  value?: TNullable extends true ? TValue | null : TValue;
 
   /**
    * Placeholder text displayed when the field is empty.
@@ -26,12 +27,29 @@ export interface BaseValueField<TProps, TValue, TMeta extends FieldMeta = FieldM
   placeholder?: DynamicText;
 
   required?: boolean;
+
+  /**
+   * Whether the field accepts `null` as a valid value.
+   *
+   * When `true`, `value` may be `null` and an omitted `value` resolves to `null`
+   * (rather than the type-specific empty default). Orthogonal to `required`.
+   *
+   * Read-side caveat: a user clearing a text input reads back as `""`, not `null`
+   * — this matches classic Reactive Forms and is enforced by the Web IDL contract.
+   * `nullable` is a contract for accepted values, not a guarantee of emitted ones.
+   *
+   * @default false
+   */
+  nullable?: TNullable;
 }
 
 export function isValueField<TProps, TMeta extends FieldMeta = FieldMeta>(
   field: FieldDef<TProps, TMeta>,
-): field is BaseValueField<TProps, ValueType, TMeta> {
-  return 'value' in field;
+): field is BaseValueField<TProps, ValueType, TMeta, boolean> {
+  // `nullable: true` without an explicit `value` is still a value-bearing declaration:
+  // the field resolves to `null` at runtime. Treating it as a value field keeps
+  // downstream narrowing consistent with getFieldDefaultValue's behavior.
+  return 'value' in field || 'nullable' in field;
 }
 
 type ExcludedKeys =
@@ -39,6 +57,7 @@ type ExcludedKeys =
   | 'conditionals'
   | 'value'
   | 'valueType'
+  | 'nullable'
   | 'disabled'
   | 'readonly'
   | 'hidden'
@@ -68,6 +87,6 @@ type ExcludedKeys =
   | 'skipDefaultWrappers';
 // Note: 'meta' is NOT excluded - components must handle meta attributes
 
-export type ValueFieldComponent<T extends BaseValueField<Record<string, unknown> | unknown, unknown>> = Prettify<
+export type ValueFieldComponent<T extends BaseValueField<Record<string, unknown> | unknown, unknown, FieldMeta, boolean>> = Prettify<
   WithInputSignals<Omit<T, ExcludedKeys>>
 >;

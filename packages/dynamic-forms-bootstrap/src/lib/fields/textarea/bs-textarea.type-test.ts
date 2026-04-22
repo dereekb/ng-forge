@@ -94,7 +94,8 @@ describe('BsTextareaField - Exhaustive Whitelist', () => {
     | 'schemas'
     // From BaseValueField
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   type ActualKeys = keyof BsTextareaField;
 
@@ -175,7 +176,7 @@ describe('BsTextareaField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is string', () => {
-      expectTypeOf<BsTextareaField['value']>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<BsTextareaField['value']>().toEqualTypeOf<string | null | undefined>();
     });
 
     it('placeholder', () => {

@@ -104,7 +104,8 @@ describe('MatInputField (String) - Exhaustive Whitelist', () => {
     | 'schemas'
     // From BaseValueField
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   type ActualKeys = keyof StringInputField;
 
@@ -206,7 +207,7 @@ describe('MatInputField (String) - Exhaustive Whitelist', () => {
 
   describe('value field keys from BaseValueField', () => {
     it('value is string for string input', () => {
-      expectTypeOf<StringInputField['value']>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<StringInputField['value']>().toEqualTypeOf<string | null | undefined>();
     });
 
     it('placeholder', () => {
@@ -255,7 +256,8 @@ describe('MatInputField (Number) - Exhaustive Whitelist', () => {
     | 'derivation'
     | 'schemas'
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   type ActualKeys = keyof NumberInputField;
 
@@ -280,7 +282,7 @@ describe('MatInputField (Number) - Exhaustive Whitelist', () => {
 
   describe('value type', () => {
     it('value is number for number input', () => {
-      expectTypeOf<NumberInputField['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<NumberInputField['value']>().toEqualTypeOf<number | null | undefined>();
     });
   });
 });
@@ -367,7 +369,7 @@ describe('MatInputField - Union Type Narrowing', () => {
 
       if (isNumberInput(field)) {
         // After narrowing, value should be number | undefined
-        expectTypeOf(field.value).toEqualTypeOf<number | undefined>();
+        expectTypeOf(field.value).toEqualTypeOf<number | null | undefined>();
         expectTypeOf(field.props.type).toEqualTypeOf<'number'>();
       }
     });
@@ -382,7 +384,7 @@ describe('MatInputField - Union Type Narrowing', () => {
 
       if (isStringInput(field)) {
         // After narrowing, value should be string | undefined
-        expectTypeOf(field.value).toEqualTypeOf<string | undefined>();
+        expectTypeOf(field.value).toEqualTypeOf<string | null | undefined>();
       }
     });
   });
@@ -392,7 +394,7 @@ describe('MatInputField - Union Type Narrowing', () => {
       type NumberVariant = Extract<MatInputField, { props: { type: 'number' } }>;
 
       // Value must be number
-      expectTypeOf<NumberVariant['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<NumberVariant['value']>().toEqualTypeOf<number | null | undefined>();
 
       // Props must have type: 'number'
       expectTypeOf<NumberVariant['props']['type']>().toEqualTypeOf<'number'>();
@@ -403,13 +405,13 @@ describe('MatInputField - Union Type Narrowing', () => {
       type StringVariant = Exclude<MatInputField, { props: { type: 'number' } }>;
 
       // Value must be string
-      expectTypeOf<StringVariant['value']>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<StringVariant['value']>().toEqualTypeOf<string | null | undefined>();
     });
 
     it('should verify string input types all produce string values', () => {
       // For string input types, we verify through the union's value type
       type StringInputValue = Exclude<MatInputField, { props: { type: 'number' } }>['value'];
-      expectTypeOf<StringInputValue>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<StringInputValue>().toEqualTypeOf<string | null | undefined>();
     });
   });
 
@@ -419,7 +421,7 @@ describe('MatInputField - Union Type Narrowing', () => {
       const processField = (field: MatInputField) => {
         if (isNumberInput(field)) {
           // Type guard narrows correctly
-          expectTypeOf(field.value).toEqualTypeOf<number | undefined>();
+          expectTypeOf(field.value).toEqualTypeOf<number | null | undefined>();
           expectTypeOf(field.props.type).toEqualTypeOf<'number'>();
         }
       };
@@ -487,8 +489,8 @@ describe('MatInputField - Union Type Narrowing', () => {
       };
 
       // Verify the extracted types have correct value types
-      expectTypeOf(numberField.value).toEqualTypeOf<number | undefined>();
-      expectTypeOf(textField.value).toEqualTypeOf<string | undefined>();
+      expectTypeOf(numberField.value).toEqualTypeOf<number | null | undefined>();
+      expectTypeOf(textField.value).toEqualTypeOf<string | null | undefined>();
     });
 
     it('should work with array of mixed input fields', () => {
@@ -500,13 +502,13 @@ describe('MatInputField - Union Type Narrowing', () => {
 
       // When iterating, each field is the full union
       fields.forEach((field) => {
-        expectTypeOf(field.value).toEqualTypeOf<string | number | undefined>();
+        expectTypeOf(field.value).toEqualTypeOf<string | number | null | undefined>();
 
         // But we can narrow with type guards
         if (isNumberInput(field)) {
-          expectTypeOf(field.value).toEqualTypeOf<number | undefined>();
+          expectTypeOf(field.value).toEqualTypeOf<number | null | undefined>();
         } else {
-          expectTypeOf(field.value).toEqualTypeOf<string | undefined>();
+          expectTypeOf(field.value).toEqualTypeOf<string | null | undefined>();
         }
       });
     });

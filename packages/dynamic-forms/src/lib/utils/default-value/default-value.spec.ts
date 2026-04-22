@@ -263,6 +263,29 @@ describe('getFieldDefaultValue', () => {
       expect(result).toBe(false);
     });
 
+    it('should return empty array for array field with explicit null value', () => {
+      const field: FieldDef<any> = {
+        type: 'array',
+        key: 'items',
+        value: null,
+      };
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return NaN for number input field with explicit null value', () => {
+      const field: FieldDef<any> = {
+        type: 'input',
+        key: 'age',
+        value: null,
+        props: { type: 'number' },
+      };
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBeNaN();
+    });
+
     it('should handle explicit undefined value (fall through to type default)', () => {
       const field: FieldDef<any> = {
         type: 'input',
@@ -487,6 +510,175 @@ describe('getFieldDefaultValue', () => {
         verified: true,
         settings: { theme: 'dark' },
       });
+    });
+  });
+
+  describe('nullable fields', () => {
+    it('should return null for nullable field with no explicit value', () => {
+      const field: FieldDef<any> = {
+        type: 'input',
+        key: 'name',
+        nullable: true,
+      } as FieldDef<any>;
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for nullable field with explicit null value', () => {
+      const field: FieldDef<any> = {
+        type: 'input',
+        key: 'name',
+        nullable: true,
+        value: null,
+      } as FieldDef<any>;
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBeNull();
+    });
+
+    it('should preserve explicit value when nullable is true and value is not null', () => {
+      const field: FieldDef<any> = {
+        type: 'input',
+        key: 'name',
+        nullable: true,
+        value: 'hello',
+      } as FieldDef<any>;
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBe('hello');
+    });
+
+    it('should return null for nullable array field', () => {
+      const field: FieldDef<any> = {
+        type: 'array',
+        key: 'items',
+        nullable: true,
+      } as FieldDef<any>;
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null for nullable number input', () => {
+      const field: FieldDef<any> = {
+        type: 'input',
+        key: 'age',
+        nullable: true,
+        props: { type: 'number' },
+      } as FieldDef<any>;
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBeNull();
+    });
+
+    it('should fall through to type default when nullable is false with value null', () => {
+      const field: FieldDef<any> = {
+        type: 'input',
+        key: 'name',
+        nullable: false,
+        value: null,
+      } as FieldDef<any>;
+      const result = getFieldDefaultValue(field, registry);
+
+      expect(result).toBe('');
+    });
+  });
+
+  describe('nullable across field types', () => {
+    // Single parametrized smoke test — if nullable resolution ever gets special-cased
+    // per field type, this catches it. Only includes value-bearing types (BaseValueField);
+    // checkbox/toggle (BaseCheckedField) do not support nullable in this pass.
+    const FIELD_TYPES = [
+      { type: 'input' },
+      { type: 'input', props: { type: 'number' } }, // numeric input
+      { type: 'select' },
+      { type: 'array' },
+    ] as const;
+
+    for (const config of FIELD_TYPES) {
+      const label = 'props' in config ? `${config.type} (type: ${config.props.type})` : config.type;
+
+      it(`resolves nullable:true without value to null for ${label}`, () => {
+        const field = {
+          ...config,
+          key: 'foo',
+          nullable: true,
+        } as unknown as FieldDef<any>;
+        expect(getFieldDefaultValue(field, registry)).toBeNull();
+      });
+
+      it(`resolves nullable:true + explicit null to null for ${label}`, () => {
+        const field = {
+          ...config,
+          key: 'foo',
+          nullable: true,
+          value: null,
+        } as unknown as FieldDef<any>;
+        expect(getFieldDefaultValue(field, registry)).toBeNull();
+      });
+    }
+  });
+
+  describe('nullable inside containers', () => {
+    it('should propagate null default when a group contains a nullable field', () => {
+      const field = {
+        type: 'group',
+        key: 'profile',
+        fields: [
+          { type: 'input', key: 'firstName' },
+          { type: 'input', key: 'middleName', nullable: true },
+        ],
+      } satisfies FieldDef<unknown>;
+
+      const result = getFieldDefaultValue(field, registry);
+      expect(result).toEqual({ firstName: '', middleName: null });
+    });
+
+    it('should propagate null default through nested groups', () => {
+      const field = {
+        type: 'group',
+        key: 'outer',
+        fields: [
+          {
+            type: 'group',
+            key: 'inner',
+            fields: [{ type: 'input', key: 'nickname', nullable: true }],
+          },
+        ],
+      } satisfies FieldDef<unknown>;
+
+      const result = getFieldDefaultValue(field, registry);
+      expect(result).toEqual({ inner: { nickname: null } });
+    });
+
+    it('should preserve null values in array primitive items', () => {
+      // Primitive-item array: `fields` is a single-item array of FieldDef (not a tuple).
+      // Each item in the declared template contributes one initial entry — here the sole
+      // nullable input resolves to `null`, producing `[null]`.
+      const field = {
+        type: 'array',
+        key: 'nicknames',
+        fields: [{ type: 'input', key: 'item', nullable: true }],
+      } satisfies FieldDef<unknown>;
+
+      const result = getFieldDefaultValue(field, registry);
+      expect(result).toEqual([null]);
+    });
+
+    it('should keep nullable orthogonal from containers — non-nullable inside group stays on type default', () => {
+      const field = {
+        type: 'group',
+        key: 'profile',
+        fields: [
+          { type: 'input', key: 'firstName' },
+          { type: 'input', key: 'middleName', nullable: true },
+          { type: 'input', key: 'lastName' },
+        ],
+      } satisfies FieldDef<unknown>;
+
+      const result = getFieldDefaultValue(field, registry);
+      expect(result).toEqual({ firstName: '', middleName: null, lastName: '' });
     });
   });
 });

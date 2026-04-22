@@ -136,15 +136,30 @@ function resolveSchemaProperties(schema: SchemaObject): { properties: Array<[str
 }
 
 function schemaToTsType(propertyName: string, schema: SchemaObject, parentName: string, nestedInterfaces: string[]): string {
-  const type = schema.type as string | undefined;
+  const rawType = (schema as Record<string, unknown>)['type'];
+  // Normalize OpenAPI 3.1 `type: [T, 'null']` → `type: T` and remember nullability.
+  let type: string | undefined;
+  let nullableFrom31Type = false;
+  if (Array.isArray(rawType)) {
+    const nonNull = (rawType as string[]).filter((t) => t !== 'null');
+    nullableFrom31Type = nonNull.length !== rawType.length;
+    type = nonNull[0];
+  } else {
+    type = rawType as string | undefined;
+  }
+  const isNullable = (schema as Record<string, unknown>)['nullable'] === true || nullableFrom31Type;
+  // Filter `null` out of enum values when the type is nullable — it's handled by `| null` below.
+  const enumValues = schema.enum ? schema.enum.filter((v: unknown) => v !== null) : undefined;
 
-  if (schema.enum) {
-    return schema.enum.map((v: unknown) => (typeof v === 'string' ? `'${v}'` : String(v))).join(' | ');
+  if (enumValues && enumValues.length > 0) {
+    const enumUnion = enumValues.map((v: unknown) => (typeof v === 'string' ? `'${v}'` : String(v))).join(' | ');
+    // Enum + nullable: the union must include null (OpenAPI 3.0 nullable keyword can combine with enum).
+    return isNullable ? `${enumUnion} | null` : enumUnion;
   }
 
-  // Handle nullable (OpenAPI 3.0)
-  if ((schema as Record<string, unknown>)['nullable']) {
-    const baseSchema = { ...schema, nullable: undefined } as SchemaObject;
+  // Handle nullable (OpenAPI 3.0 and 3.1 type:[T,null])
+  if (isNullable) {
+    const baseSchema = { ...schema, nullable: undefined, type } as SchemaObject;
     const baseType = schemaToTsType(propertyName, baseSchema, parentName, nestedInterfaces);
     return `${baseType} | null`;
   }
@@ -173,14 +188,25 @@ function schemaToTsType(propertyName: string, schema: SchemaObject, parentName: 
     return types.join(' | ');
   }
 
-  // Handle allOf → intersection
+  // Handle allOf → intersection.
+  // Each branch that is itself a union (contains `|`) must be parenthesised so the
+  // intersection operator binds tighter than the outer unions. Without parens,
+  // TypeScript reads `A & B | null` as `(A & B) | null`, which is looser than the
+  // strict intersection semantics of allOf. With parens, `(A) & (B | null)` reduces
+  // correctly: null is incompatible with A so it drops out of the intersection.
   if (schema.allOf) {
     const types = (schema.allOf as SchemaObject[])
       .filter((s) => !isReferenceObject(s))
-      .map((s) => schemaToTsType(propertyName, s, parentName, nestedInterfaces));
+      .map((s) => {
+        const t = schemaToTsType(propertyName, s, parentName, nestedInterfaces);
+        return t.includes(' | ') ? `(${t})` : t;
+      });
     return types.join(' & ');
   }
 
+  // JSON Schema / OpenAPI 3.1 allow `type: 'null'` as a standalone branch
+  // (commonly seen inside oneOf / anyOf to express "X or null").
+  if (type === 'null') return 'null';
   if (type === 'string') return 'string';
   if (type === 'integer' || type === 'number') return 'number';
   if (type === 'boolean') return 'boolean';

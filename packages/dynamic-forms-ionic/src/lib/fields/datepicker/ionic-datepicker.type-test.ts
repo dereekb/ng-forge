@@ -127,6 +127,7 @@ describe('IonicDatepickerField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From DatepickerField
     | 'minDate'
     | 'maxDate'
@@ -231,7 +232,7 @@ describe('IonicDatepickerField - Exhaustive Whitelist', () => {
 
   describe('value field keys from BaseValueField', () => {
     it('value can be Date or string', () => {
-      expectTypeOf<IonicDatepickerField['value']>().toEqualTypeOf<Date | string | undefined>();
+      expectTypeOf<IonicDatepickerField['value']>().toEqualTypeOf<Date | string | null | undefined>();
     });
 
     it('placeholder', () => {

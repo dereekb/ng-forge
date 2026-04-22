@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MatFormConfigSchema } from '../mat-form-config.schema';
 import { MatInputFieldSchema } from '../fields/mat-input-field.schema';
+import { MatLeafFieldSchema } from '../mat-leaf-field.schema';
 
 describe('MatFormConfigSchema', () => {
   describe('basic form configs', () => {
@@ -376,6 +377,113 @@ describe('MatInputFieldSchema', () => {
       },
     };
     const result = MatInputFieldSchema.safeParse(field);
+    expect(result.success).toBe(true);
+  });
+
+  it('should accept nullable:true with value:null and preserve null', () => {
+    const field = {
+      key: 'middleName',
+      type: 'input',
+      label: 'Middle Name',
+      nullable: true,
+      value: null,
+    };
+    const result = MatInputFieldSchema.safeParse(field);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.value).toBeNull();
+      expect(result.data.nullable).toBe(true);
+    }
+  });
+
+  it('should accept nullable:true without an explicit value', () => {
+    const field = {
+      key: 'middleName',
+      type: 'input',
+      label: 'Middle Name',
+      nullable: true,
+    };
+    const result = MatInputFieldSchema.safeParse(field);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nullable).toBe(true);
+      expect(result.data.value).toBeUndefined();
+    }
+  });
+
+  it('should accept nullable:true alongside required:true (orthogonal)', () => {
+    const field = {
+      key: 'middleName',
+      type: 'input',
+      label: 'Middle Name',
+      nullable: true,
+      required: true,
+    };
+    const result = MatInputFieldSchema.safeParse(field);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nullable).toBe(true);
+      expect(result.data.required).toBe(true);
+    }
+  });
+});
+
+describe('MatInputFieldSchema - nullable gating (direct parse)', () => {
+  it('should reject value:null on the individual schema when nullable is absent', () => {
+    const field = {
+      key: 'name',
+      type: 'input',
+      label: 'Name',
+      value: null,
+    };
+    const result = MatInputFieldSchema.safeParse(field);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues[0];
+      expect(issue.path).toEqual(['value']);
+      expect(issue.message).toMatch(/nullable/);
+    }
+  });
+});
+
+describe('MatLeafFieldSchema - nullable gating', () => {
+  it('should reject value:null when nullable is absent', () => {
+    const field = {
+      key: 'name',
+      type: 'input',
+      label: 'Name',
+      value: null,
+    };
+    const result = MatLeafFieldSchema.safeParse(field);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues[0];
+      expect(issue.path).toEqual(['value']);
+      expect(issue.message).toMatch(/nullable/);
+    }
+  });
+
+  it('should reject value:null when nullable is explicitly false', () => {
+    const field = {
+      key: 'name',
+      type: 'input',
+      label: 'Name',
+      nullable: false,
+      value: null,
+    };
+    const result = MatLeafFieldSchema.safeParse(field);
+    expect(result.success).toBe(false);
+  });
+
+  it('should accept value:null when nullable is true', () => {
+    const field = {
+      key: 'name',
+      type: 'input',
+      label: 'Name',
+      nullable: true,
+      value: null,
+    };
+    const result = MatLeafFieldSchema.safeParse(field);
     expect(result.success).toBe(true);
   });
 });

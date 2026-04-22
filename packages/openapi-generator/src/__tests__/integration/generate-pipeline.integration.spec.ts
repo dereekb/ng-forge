@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runGenerateAction } from '../../cli/commands/generate.command.js';
-import { createTempDir, cleanupDir, fixturePath, readGenerated, readConfigFile, fileExists } from './helpers.js';
+import { createTempDir, cleanupDir, fixturePath, readGenerated, readConfigFile, fileExists, typecheckGeneratedForm } from './helpers.js';
 
 let outputDir: string;
 let exitSpy: ReturnType<typeof vi.spyOn>;
@@ -65,6 +65,15 @@ describe('Basic Pipeline', () => {
     expect(config['endpoints']).toEqual(['POST:/users']);
     expect(config['decisions']).toBeDefined();
   });
+
+  it('should produce a form file that compiles against the published types', async () => {
+    await generate('basic-post.yaml');
+
+    const formPath = join(outputDir, 'forms', 'create-user.form.ts');
+    const diagnostics = typecheckGeneratedForm(formPath);
+
+    expect(diagnostics, `Generated form should type-check cleanly. Errors:\n${diagnostics.join('\n')}`).toEqual([]);
+  }, 30_000); // tsc program creation + type-check is slow in CI
 });
 
 // ─── B. Validators ───────────────────────────────────────────────────
@@ -376,5 +385,65 @@ describe('Edge Cases', () => {
     expect(createPet).toBe(true);
     expect(updatePet).toBe(true);
     expect(getPet).toBe(true);
+  });
+});
+
+// ─── N. Nullable Values (issue #341) ─────────────────────────────────
+
+describe('Nullable values', () => {
+  it('should emit nullable:true + value:null for OpenAPI 3.0 nullable fields', async () => {
+    await generate('nullable-values.yaml');
+
+    const form = await readGenerated(outputDir, 'forms', 'create-user.form.ts');
+    // middleName has nullable + default:null
+    expect(form).toContain("key: 'middleName'");
+    expect(form).toMatch(/value:\s*null,\s*\n\s*nullable:\s*true/);
+    // nickname has nullable without default → just nullable
+    expect(form).toContain("key: 'nickname'");
+    // age has nullable:true + default:null on a numeric field
+    expect(form).toContain("key: 'age'");
+    expect(form).toContain('type: "number"');
+  });
+
+  it('should emit union types with null in generated interfaces', async () => {
+    await generate('nullable-values.yaml');
+
+    const types = await readGenerated(outputDir, 'types', 'create-user.types.ts');
+    expect(types).toContain('name: string');
+    expect(types).toContain('middleName?: string | null');
+    expect(types).toContain('age?: number | null');
+  });
+
+  it('should produce a form file that compiles against the published types (regression for #341)', async () => {
+    await generate('nullable-values.yaml');
+
+    const formPath = join(outputDir, 'forms', 'create-user.form.ts');
+    const diagnostics = typecheckGeneratedForm(formPath);
+
+    expect(diagnostics, `Generated form should type-check cleanly. Errors:\n${diagnostics.join('\n')}`).toEqual([]);
+  }, 30_000); // tsc program creation + type-check is slow in CI
+
+  it('should silently drop nullable:true for field types that do not support it', async () => {
+    await generate('nullable-edge-cases.yaml');
+
+    const form = await readGenerated(outputDir, 'forms', 'create-entity.form.ts');
+    // Nullable on value fields (select, datepicker, input) — emitted
+    expect(form).toMatch(/key: 'status',[\s\S]+?type: 'select',[\s\S]+?nullable: true/);
+    expect(form).toMatch(/key: 'startDate',[\s\S]+?type: 'datepicker',[\s\S]+?nullable: true/);
+    // Nullable on container/checked — NOT emitted
+    // (find the 'subscribed' block: checkbox field; it should NOT have `nullable: true` on that block)
+    const subscribedBlock = form.substring(form.indexOf("key: 'subscribed'"));
+    expect(subscribedBlock.split('},')[0]).not.toContain('nullable: true');
+    const addressBlock = form.substring(form.indexOf("key: 'address'"), form.indexOf("key: 'tags'"));
+    expect(addressBlock).not.toContain('nullable: true');
+  });
+
+  it('should propagate nullable onto array primitive templates', async () => {
+    await generate('nullable-edge-cases.yaml');
+
+    const form = await readGenerated(outputDir, 'forms', 'create-entity.form.ts');
+    // scores: array of nullable integers → template has nullable:true, outer array does not
+    const scoresBlock = form.substring(form.indexOf("key: 'scores'"), form.indexOf("key: 'subscribed'"));
+    expect(scoresBlock).toMatch(/template:\s*\{[\s\S]+?nullable: true/);
   });
 });

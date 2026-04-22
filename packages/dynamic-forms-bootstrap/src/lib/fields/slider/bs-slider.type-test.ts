@@ -95,6 +95,7 @@ describe('BsSliderField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From SliderField
     | 'minValue'
     | 'maxValue'
@@ -175,7 +176,7 @@ describe('BsSliderField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is number', () => {
-      expectTypeOf<BsSliderField['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<BsSliderField['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {

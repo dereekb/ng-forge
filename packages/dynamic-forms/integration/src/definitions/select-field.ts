@@ -1,4 +1,4 @@
-import { BaseValueField, FieldOption } from '@ng-forge/dynamic-forms';
+import { BaseValueField, FieldMeta, FieldOption } from '@ng-forge/dynamic-forms';
 
 /**
  * Base props for select fields. Intentionally empty — adapter libraries
@@ -6,7 +6,12 @@ import { BaseValueField, FieldOption } from '@ng-forge/dynamic-forms';
  */
 export type SelectProps = object;
 
-export interface SelectField<T, TProps = SelectProps> extends BaseValueField<TProps, T> {
+export interface SelectField<T, TProps = SelectProps, TNullable extends boolean = boolean> extends BaseValueField<
+  TProps,
+  T,
+  FieldMeta,
+  TNullable
+> {
   type: 'select';
   readonly options: readonly FieldOption<T>[];
 }

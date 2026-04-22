@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import { TextFieldSchema, HiddenFieldSchema } from '../../src/lib/schemas/leaves';
+import { nullableValueRefine } from '../../src/lib/schemas/field/nullable-value.refinement';
 import {
-  PrimeInputFieldSchema,
+  PrimeInputFieldSchemaObject,
   PrimeCheckboxFieldSchema,
-  PrimeRadioFieldSchema,
-  PrimeSelectFieldSchema,
-  PrimeMultiCheckboxFieldSchema,
-  PrimeDatepickerFieldSchema,
-  PrimeTextareaFieldSchema,
-  PrimeSliderFieldSchema,
+  PrimeRadioFieldSchemaObject,
+  PrimeSelectFieldSchemaObject,
+  PrimeMultiCheckboxFieldSchemaObject,
+  PrimeDatepickerFieldSchemaObject,
+  PrimeTextareaFieldSchemaObject,
+  PrimeSliderFieldSchemaObject,
   PrimeToggleFieldSchema,
   PrimeButtonFieldSchema,
   PrimeSubmitButtonFieldSchema,
@@ -21,24 +22,26 @@ import {
 /**
  * Discriminated union of all PrimeNG leaf field types.
  */
-export const PrimeLeafFieldSchema = z.discriminatedUnion('type', [
-  TextFieldSchema,
-  HiddenFieldSchema,
-  PrimeInputFieldSchema,
-  PrimeCheckboxFieldSchema,
-  PrimeRadioFieldSchema,
-  PrimeSelectFieldSchema,
-  PrimeMultiCheckboxFieldSchema,
-  PrimeDatepickerFieldSchema,
-  PrimeTextareaFieldSchema,
-  PrimeSliderFieldSchema,
-  PrimeToggleFieldSchema,
-  PrimeButtonFieldSchema,
-  PrimeSubmitButtonFieldSchema,
-  PrimeNextButtonFieldSchema,
-  PrimePreviousButtonFieldSchema,
-  PrimeAddArrayItemButtonFieldSchema,
-  PrimeRemoveArrayItemButtonFieldSchema,
-]);
+export const PrimeLeafFieldSchema = z
+  .discriminatedUnion('type', [
+    TextFieldSchema,
+    HiddenFieldSchema,
+    PrimeInputFieldSchemaObject,
+    PrimeCheckboxFieldSchema,
+    PrimeRadioFieldSchemaObject,
+    PrimeSelectFieldSchemaObject,
+    PrimeMultiCheckboxFieldSchemaObject,
+    PrimeDatepickerFieldSchemaObject,
+    PrimeTextareaFieldSchemaObject,
+    PrimeSliderFieldSchemaObject,
+    PrimeToggleFieldSchema,
+    PrimeButtonFieldSchema,
+    PrimeSubmitButtonFieldSchema,
+    PrimeNextButtonFieldSchema,
+    PrimePreviousButtonFieldSchema,
+    PrimeAddArrayItemButtonFieldSchema,
+    PrimeRemoveArrayItemButtonFieldSchema,
+  ])
+  .superRefine(nullableValueRefine);
 
 export type PrimeLeafFieldSchemaType = z.infer<typeof PrimeLeafFieldSchema>;

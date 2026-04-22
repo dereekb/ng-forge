@@ -96,6 +96,7 @@ describe('MatSliderField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From SliderField
     | 'minValue'
     | 'maxValue'
@@ -176,7 +177,7 @@ describe('MatSliderField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is number', () => {
-      expectTypeOf<MatSliderField['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<MatSliderField['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {

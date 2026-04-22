@@ -118,7 +118,8 @@ describe('IonicInputField (String) - Exhaustive Whitelist', () => {
     | 'schemas'
     // From BaseValueField
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   // String input field (without props.type: 'number')
   type StringInputField = Extract<IonicInputField, { props?: { type?: 'text' | 'email' | 'password' | 'tel' | 'url' } }>;
@@ -221,7 +222,7 @@ describe('IonicInputField (String) - Exhaustive Whitelist', () => {
 
   describe('value field keys from BaseValueField', () => {
     it('value is string for string input', () => {
-      expectTypeOf<StringInputField['value']>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<StringInputField['value']>().toEqualTypeOf<string | null | undefined>();
     });
 
     it('placeholder', () => {
@@ -267,7 +268,8 @@ describe('IonicInputField (Number) - Exhaustive Whitelist', () => {
     | 'derivation'
     | 'schemas'
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   // Number input field (with props.type: 'number')
   type NumberInputField = Extract<IonicInputField, { props: { type: 'number' } }>;
@@ -293,7 +295,7 @@ describe('IonicInputField (Number) - Exhaustive Whitelist', () => {
 
   describe('value type', () => {
     it('value is number for number input', () => {
-      expectTypeOf<NumberInputField['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<NumberInputField['value']>().toEqualTypeOf<number | null | undefined>();
     });
   });
 });

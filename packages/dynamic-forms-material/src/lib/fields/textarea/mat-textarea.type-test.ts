@@ -112,7 +112,8 @@ describe('MatTextareaField - Exhaustive Whitelist', () => {
     | 'schemas'
     // From BaseValueField
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   type ActualKeys = keyof MatTextareaField;
 
@@ -193,7 +194,7 @@ describe('MatTextareaField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is string', () => {
-      expectTypeOf<MatTextareaField['value']>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<MatTextareaField['value']>().toEqualTypeOf<string | null | undefined>();
     });
 
     it('placeholder', () => {

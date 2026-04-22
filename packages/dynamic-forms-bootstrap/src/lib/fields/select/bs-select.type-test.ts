@@ -108,6 +108,7 @@ describe('BsSelectField - Exhaustive Whitelist', () => {
     // From BaseValueField
     | 'value'
     | 'placeholder'
+    | 'nullable'
     // From SelectField
     | 'options';
 
@@ -190,8 +191,8 @@ describe('BsSelectField - Exhaustive Whitelist', () => {
 
   describe('value field keys', () => {
     it('value is generic type', () => {
-      expectTypeOf<BsSelectField<string>['value']>().toEqualTypeOf<string | undefined>();
-      expectTypeOf<BsSelectField<number>['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<BsSelectField<string>['value']>().toEqualTypeOf<string | null | undefined>();
+      expectTypeOf<BsSelectField<number>['value']>().toEqualTypeOf<number | null | undefined>();
     });
 
     it('placeholder', () => {
@@ -237,6 +238,6 @@ describe('BsSelectField - Usage', () => {
       value: 2,
     };
 
-    expectTypeOf(field.value).toEqualTypeOf<number | undefined>();
+    expectTypeOf(field.value).toEqualTypeOf<number | null | undefined>();
   });
 });

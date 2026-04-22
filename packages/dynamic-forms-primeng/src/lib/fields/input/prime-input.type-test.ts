@@ -86,7 +86,8 @@ describe('PrimeInputField (String) - Exhaustive Whitelist', () => {
     | 'schemas'
     // From BaseValueField
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   // String input field (without props.type: 'number')
   type StringInputField = Extract<PrimeInputField, { props?: { type?: 'text' | 'email' | 'password' | 'tel' | 'url' } }>;
@@ -189,7 +190,7 @@ describe('PrimeInputField (String) - Exhaustive Whitelist', () => {
 
   describe('value field keys from BaseValueField', () => {
     it('value is string for string input', () => {
-      expectTypeOf<StringInputField['value']>().toEqualTypeOf<string | undefined>();
+      expectTypeOf<StringInputField['value']>().toEqualTypeOf<string | null | undefined>();
     });
 
     it('placeholder', () => {
@@ -235,7 +236,8 @@ describe('PrimeInputField (Number) - Exhaustive Whitelist', () => {
     | 'derivation'
     | 'schemas'
     | 'value'
-    | 'placeholder';
+    | 'placeholder'
+    | 'nullable';
 
   // Number input field (with props.type: 'number')
   type NumberInputField = Extract<PrimeInputField, { props: { type: 'number' } }>;
@@ -261,7 +263,7 @@ describe('PrimeInputField (Number) - Exhaustive Whitelist', () => {
 
   describe('value type', () => {
     it('value is number for number input', () => {
-      expectTypeOf<NumberInputField['value']>().toEqualTypeOf<number | undefined>();
+      expectTypeOf<NumberInputField['value']>().toEqualTypeOf<number | null | undefined>();
     });
   });
 });

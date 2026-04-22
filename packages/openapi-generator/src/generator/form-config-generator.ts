@@ -41,6 +41,10 @@ function generateFieldLines(field: FieldConfig, indent: string): string[] {
     lines.push(`${indent}  value: ${JSON.stringify(field.value)},`);
   }
 
+  if (field.nullable) {
+    lines.push(`${indent}  nullable: true,`);
+  }
+
   if (field.placeholder) {
     lines.push(`${indent}  placeholder: '${escapeString(field.placeholder)}',`);
   }

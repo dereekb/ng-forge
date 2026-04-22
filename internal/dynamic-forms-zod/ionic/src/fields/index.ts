@@ -16,16 +16,40 @@ import {
   IonicMultiCheckboxPropsSchema,
   IonicButtonPropsSchema,
 } from '../props';
+import { nullableValueRefine } from '../../../src/lib/schemas/field/nullable-value.refinement';
 
 const IonicValueFieldBase = BaseFieldDefSchema.merge(FieldWithValidationSchema);
 
 // Input field
-export const IonicInputFieldSchema = IonicValueFieldBase.extend({
+/*
+ * For each value-bearing field schema below we follow a dual-export pattern:
+ *
+ *   const Xxx...FieldSchemaObject = base.extend({ ... });   // raw ZodObject
+ *   export const Xxx...FieldSchema =
+ *     Xxx...FieldSchemaObject.superRefine(nullableValueRefine);   // public, refined
+ *
+ * The raw object is required because z.discriminatedUnion in the leaf schema
+ * rejects ZodEffects; the refined version enforces the cross-field contract
+ * (`value: null` requires `nullable: true`) on direct parse. The union applies
+ * `.superRefine(nullableValueRefine)` at its top level too, so the refinement
+ * runs for full-config validation regardless of which entry point is used.
+ */
+
+const IonicInputFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('input'),
-  value: z.string().optional(),
+  nullable: z.boolean().optional(),
+  value: z.string().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   props: IonicInputPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicInputFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicInputFieldSchema = IonicInputFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicInputFieldSchemaObject };
 
 // Checkbox field
 export const IonicCheckboxFieldSchema = IonicValueFieldBase.extend({
@@ -36,13 +60,22 @@ export const IonicCheckboxFieldSchema = IonicValueFieldBase.extend({
 });
 
 // Radio field
-export const IonicRadioFieldSchema = IonicValueFieldBase.extend({
+const IonicRadioFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('radio'),
-  value: z.unknown().optional(),
+  nullable: z.boolean().optional(),
+  value: z.unknown().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   options: FieldOptionsSchema,
   props: IonicRadioPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicRadioFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicRadioFieldSchema = IonicRadioFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicRadioFieldSchemaObject };
 
 // Toggle field
 export const IonicToggleFieldSchema = IonicValueFieldBase.extend({
@@ -53,9 +86,10 @@ export const IonicToggleFieldSchema = IonicValueFieldBase.extend({
 });
 
 // Slider field
-export const IonicSliderFieldSchema = IonicValueFieldBase.extend({
+const IonicSliderFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('slider'),
-  value: z.number().optional(),
+  nullable: z.boolean().optional(),
+  value: z.number().nullable().optional(),
   minValue: z.number().optional(),
   maxValue: z.number().optional(),
   step: z.number().positive().optional(),
@@ -63,9 +97,18 @@ export const IonicSliderFieldSchema = IonicValueFieldBase.extend({
   props: IonicSliderPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicSliderFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicSliderFieldSchema = IonicSliderFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicSliderFieldSchemaObject };
+
 // Datepicker field
-export const IonicDatepickerFieldSchema = IonicValueFieldBase.extend({
+const IonicDatepickerFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('datepicker'),
+  nullable: z.boolean().optional(),
   value: z.union([z.string(), z.null()]).optional(),
   minDate: z.union([z.string(), z.null()]).optional(),
   maxDate: z.union([z.string(), z.null()]).optional(),
@@ -74,31 +117,66 @@ export const IonicDatepickerFieldSchema = IonicValueFieldBase.extend({
   props: IonicDatepickerPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicDatepickerFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicDatepickerFieldSchema = IonicDatepickerFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicDatepickerFieldSchemaObject };
+
 // Select field
-export const IonicSelectFieldSchema = IonicValueFieldBase.extend({
+const IonicSelectFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('select'),
-  value: z.unknown().optional(),
+  nullable: z.boolean().optional(),
+  value: z.unknown().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   options: FieldOptionsSchema,
   props: IonicSelectPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicSelectFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicSelectFieldSchema = IonicSelectFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicSelectFieldSchemaObject };
+
 // Textarea field
-export const IonicTextareaFieldSchema = IonicValueFieldBase.extend({
+const IonicTextareaFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('textarea'),
-  value: z.string().optional(),
+  nullable: z.boolean().optional(),
+  value: z.string().nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   props: IonicTextareaPropsSchema.optional(),
 });
 
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicTextareaFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicTextareaFieldSchema = IonicTextareaFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicTextareaFieldSchemaObject };
+
 // Multi-checkbox field
-export const IonicMultiCheckboxFieldSchema = IonicValueFieldBase.extend({
+const IonicMultiCheckboxFieldSchemaObject = IonicValueFieldBase.extend({
   type: z.literal('multi-checkbox'),
-  value: z.array(z.unknown()).optional(),
+  nullable: z.boolean().optional(),
+  value: z.array(z.unknown()).nullable().optional(),
   placeholder: DynamicTextSchema.optional(),
   options: FieldOptionsSchema,
   props: IonicMultiCheckboxPropsSchema.optional(),
 });
+
+/**
+ * Publicly-used schema with cross-field nullable enforcement applied:
+ * \`value: null\` is only valid when \`nullable: true\`.
+ * The raw \`IonicMultiCheckboxFieldSchemaObject\` is used internally for discriminatedUnion composition.
+ */
+export const IonicMultiCheckboxFieldSchema = IonicMultiCheckboxFieldSchemaObject.superRefine(nullableValueRefine);
+export { IonicMultiCheckboxFieldSchemaObject };
 
 // Button fields
 export const IonicButtonFieldSchema = BaseFieldDefSchema.extend({

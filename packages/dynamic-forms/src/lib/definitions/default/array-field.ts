@@ -116,27 +116,6 @@ export interface ArrayField<TFields extends readonly ArrayItemDefinition[] = rea
    * Validation fails if the array has more items than this value.
    */
   readonly maxLength?: number;
-
-  /**
-   * Template used to resolve array items that exist in the form value but have no
-   * registered template — i.e., items that were neither added via the event-based
-   * handlers (add/move/remove) nor covered by a positional entry in `fields`.
-   * This covers any scenario where the form value is updated with items the array
-   * field did not originate, including direct `parentForm().value.set(...)` calls,
-   * parent two-way binding reassignment, and initial values present on an array
-   * declared with `fields: []`.
-   *
-   * **Homogeneous arrays only.** Every restored item receives this same template
-   * regardless of value shape. Heterogeneous arrays cannot be reconciled this way —
-   * there is no reliable signal to pick the correct template from raw value alone.
-   * For heterogeneous arrays, mutate via the event-based handlers which preserve
-   * per-item template identity.
-   *
-   * Same shape as `SimplifiedArrayField.template`:
-   * - Single field → primitive item
-   * - Array of fields → object item
-   */
-  readonly restoreTemplate?: ArrayAllowedChildren | readonly ArrayAllowedChildren[];
 }
 
 /**

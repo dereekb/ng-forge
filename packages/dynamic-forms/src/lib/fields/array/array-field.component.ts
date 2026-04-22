@@ -135,8 +135,7 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
    * Detection order:
    * 1. Normalization metadata (for simplified arrays — always available at normalization time)
    * 2. Existing item definitions (non-empty full-API arrays)
-   * 3. Single-field restoreTemplate (full-API arrays restored from external values)
-   * 4. Dynamically discovered key from handleAddFromEvent (empty full-API arrays)
+   * 3. Dynamically discovered key from handleAddFromEvent (empty full-API arrays)
    *
    * Uses linkedSignal: recomputes when field() changes, supports manual set()
    * for the dynamic discovery case.
@@ -152,17 +151,6 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
     const definitions = (this.field().fields as ArrayItemDefinition[]) || [];
     if (definitions.length > 0 && !Array.isArray(definitions[0])) {
       return (definitions[0] as FieldDef<unknown>).key;
-    }
-
-    // Priority 3: Single-field restoreTemplate (full-API arrays restored from external values).
-    // Mirrors handleAddFromEvent's primitive detection — a single non-flatten FieldDef is a
-    // primitive item, so its key wraps the FormControl in the item context.
-    const restoreTemplate = this.field().restoreTemplate ?? metadata?.restoreTemplate;
-    if (restoreTemplate && !Array.isArray(restoreTemplate)) {
-      const template = restoreTemplate as FieldDef<unknown>;
-      if (getFieldValueHandling(template.type, this.rawFieldRegistry()) !== 'flatten') {
-        return template.key;
-      }
     }
 
     return undefined;
@@ -186,24 +174,18 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
   });
 
   /**
-   * Resolves the effective restore template for this array — the fallback used when
-   * the form value contains an item with no registered template (i.e., items that
-   * were neither added via event handlers nor covered by a positional entry in `fields`).
+   * Resolves the effective fallback template for this array — used when the form
+   * value contains an item with no registered template (i.e., items that were
+   * neither added via event handlers nor covered by a positional entry in `fields`).
    *
-   * Precedence:
-   * 1. Author-supplied `restoreTemplate` on the full `ArrayField`.
-   * 2. Normalization metadata — populated from `SimplifiedArrayField.template`
-   *    so every simplified array gets an automatic default.
+   * Populated from `SimplifiedArrayField.template` via normalization metadata, so every
+   * simplified array gets an automatic default. Returns undefined for full-API arrays;
+   * `createResolveItemObservable` then falls back to warn-and-drop.
    *
-   * Returns undefined when neither is configured; `createResolveItemObservable` then
-   * falls back to warn-and-drop, preserving today's behavior for full-API arrays
-   * that don't opt in.
-   *
-   * Homogeneous arrays only — all restored items receive the same template.
+   * Homogeneous arrays only — all fallback items receive the same template.
    */
-  private readonly restoreTemplate = computed<FieldDef<unknown>[] | undefined>(() => {
-    const metadata = getNormalizedArrayMetadata(this.field());
-    const raw = this.field().restoreTemplate ?? metadata?.restoreTemplate;
+  private readonly fallbackTemplate = computed<FieldDef<unknown>[] | undefined>(() => {
+    const raw = getNormalizedArrayMetadata(this.field())?.template;
     if (!raw) return undefined;
     return (Array.isArray(raw) ? [...raw] : [raw]) as FieldDef<unknown>[];
   });
@@ -615,10 +597,11 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
    * Template resolution order:
    * 1. Use overrideTemplate if provided (from recreate with stored templates)
    * 2. Use itemTemplates[index] if within defined templates range
-   * 3. Use restoreTemplate for untracked items present in the form value
-   *    (e.g., external `value.set`, parent two-way binding, initial values on a
-   *    `fields: []` array). Registers the resolved item in templateRegistry so
-   *    subsequent recreates use the fast Priority 1 path.
+   * 3. Use the simplified-array fallback template (from normalization metadata) for
+   *    untracked items present in the form value (e.g., external `value.set`, parent
+   *    two-way binding, initial values beyond what was declared via simplified `value`).
+   *    Registers the resolved item in templateRegistry so subsequent recreates use
+   *    Priority 1.
    * 4. Return undefined (item cannot be resolved without a template)
    */
   private createResolveItemObservable(index: number, overrideTemplate?: FieldDef<unknown>[]): Observable<ResolvedArrayItem | undefined> {
@@ -660,13 +643,13 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
       });
     }
 
-    // Priority 3: Use restoreTemplate fallback for untracked items in the form value.
-    // Homogeneous only — every restored item receives the same template regardless of value shape.
-    const restore = this.restoreTemplate();
-    if (restore && restore.length > 0) {
+    // Priority 3: Use the metadata fallback template for untracked items in the form value.
+    // Homogeneous only — every fallback item receives the same template regardless of value shape.
+    const fallback = this.fallbackTemplate();
+    if (fallback && fallback.length > 0) {
       return resolveArrayItem({
         index,
-        templates: this.withAutoRemove(restore),
+        templates: this.withAutoRemove(fallback),
         arrayField: this.field(),
         itemPositionMap: this.itemPositionMap,
         parentFieldSignalContext: this.parentFieldSignalContext,
@@ -678,19 +661,20 @@ export default class ArrayFieldComponent<TModel extends Record<string, unknown> 
         primitiveFieldKey: primitiveKey,
       }).pipe(
         tap((item) => {
-          // Register restored template against the generated item id so subsequent
+          // Register the fallback template against the generated item id so subsequent
           // recreates hit Priority 1 instead of re-resolving via this branch.
-          if (item) this.templateRegistry.set(item.id, restore);
+          if (item) this.templateRegistry.set(item.id, fallback);
         }),
       );
     }
 
-    // Priority 4: no template available. For full-API arrays without restoreTemplate,
-    // this is the intended signal that an untracked item cannot be rendered.
+    // Priority 4: no template available. Full-API arrays are positional by design —
+    // `fields` declares one template per item, so values extending past `fields.length`
+    // (e.g., from external `value.set`, parent two-way binding, or initial values on a
+    // `fields: []` array) have no template to render. Use the simplified array API
+    // (`template` + `value`) when you need homogeneous arrays with value-driven items.
     this.logger.warn(
-      `No template found for array item at index ${index}. ` +
-        'Add a restoreTemplate on the ArrayField (or use the simplified array API) ' +
-        'to resolve items introduced by external form-value updates.',
+      `No template found for array item at index ${index}. This likely occured for a Full-API array element that was created from the DynamicForm's value being set directly, which is currently not supported. Consider using the simplified array API.`,
     );
     return of(undefined);
   }

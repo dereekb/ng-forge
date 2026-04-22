@@ -3,7 +3,6 @@
  */
 import { expectTypeOf } from 'vitest';
 import type { ArrayField, ArrayComponent, ArrayItemDefinition, ArrayItemTemplate } from './array-field';
-import type { ArrayAllowedChildren } from '../../models/types/nesting-constraints';
 import type { ContainerLogicConfig } from '../base/container-logic-config';
 import type { RequiredKeys } from '@ng-forge/utils';
 
@@ -37,8 +36,7 @@ describe('ArrayField - Exhaustive Whitelist', () => {
     | 'fields'
     | 'logic'
     | 'minLength'
-    | 'maxLength'
-    | 'restoreTemplate';
+    | 'maxLength';
 
   type ActualKeys = keyof ArrayField;
 
@@ -108,10 +106,6 @@ describe('ArrayField - Exhaustive Whitelist', () => {
 
     it('maxLength', () => {
       expectTypeOf<ArrayField['maxLength']>().toEqualTypeOf<number | undefined>();
-    });
-
-    it('restoreTemplate', () => {
-      expectTypeOf<ArrayField['restoreTemplate']>().toEqualTypeOf<ArrayAllowedChildren | readonly ArrayAllowedChildren[] | undefined>();
     });
   });
 

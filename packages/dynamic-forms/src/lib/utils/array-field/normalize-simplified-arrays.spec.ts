@@ -767,8 +767,8 @@ describe('normalizeSimplifiedArrays', () => {
     });
   });
 
-  describe('restoreTemplate in metadata', () => {
-    it('should stash the primitive template into metadata.restoreTemplate', () => {
+  describe('template in metadata', () => {
+    it('should stash the primitive template into metadata.template', () => {
       const input = fields({
         key: 'tags',
         type: 'array',
@@ -781,10 +781,10 @@ describe('normalizeSimplifiedArrays', () => {
 
       const metadata = getNormalizedArrayMetadata(arrayField);
       expect(metadata).toBeDefined();
-      expect(metadata!.restoreTemplate).toBe(primitiveTemplate);
+      expect(metadata!.template).toBe(primitiveTemplate);
     });
 
-    it('should stash the object template (with auto-remove button appended) into metadata.restoreTemplate', () => {
+    it('should stash the object template (with auto-remove button appended) into metadata.template', () => {
       const input = fields({
         key: 'contacts',
         type: 'array',
@@ -799,16 +799,16 @@ describe('normalizeSimplifiedArrays', () => {
       expect(metadata).toBeDefined();
 
       // Object arrays embed the remove button inside the item's fields (not via
-      // autoRemoveButton metadata), so the stored restoreTemplate must include the
-      // button to keep restored items consistent with originally-declared items.
-      const stored = metadata!.restoreTemplate as ReadonlyArray<{ key: string; type: string }>;
+      // autoRemoveButton metadata), so the stored template must include the button
+      // to keep fallback items consistent with originally-declared items.
+      const stored = metadata!.template as ReadonlyArray<{ key: string; type: string }>;
       expect(stored).toHaveLength(objectTemplate.length + 1);
       expect(stored[0].key).toBe('name');
       expect(stored[1].key).toBe('phone');
       expect(stored[stored.length - 1].type).toBe('removeArrayItem');
     });
 
-    it('should populate restoreTemplate even when no values are provided', () => {
+    it('should populate metadata.template even when no values are provided', () => {
       const input = fields({
         key: 'tags',
         type: 'array',
@@ -820,10 +820,10 @@ describe('normalizeSimplifiedArrays', () => {
 
       const metadata = getNormalizedArrayMetadata(arrayField);
       expect(metadata).toBeDefined();
-      expect(metadata!.restoreTemplate).toBe(primitiveTemplate);
+      expect(metadata!.template).toBe(primitiveTemplate);
     });
 
-    it('should populate restoreTemplate when removeButton is disabled (no autoRemove)', () => {
+    it('should populate metadata.template when removeButton is disabled (no autoRemove)', () => {
       const input = fields({
         key: 'tags',
         type: 'array',
@@ -837,7 +837,7 @@ describe('normalizeSimplifiedArrays', () => {
       const metadata = getNormalizedArrayMetadata(arrayField);
       expect(metadata).toBeDefined();
       expect(metadata!.autoRemoveButton).toBeUndefined();
-      expect(metadata!.restoreTemplate).toBe(objectTemplate);
+      expect(metadata!.template).toBe(objectTemplate);
     });
   });
 });

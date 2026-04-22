@@ -1308,38 +1308,8 @@ describe('ArrayFieldComponent', () => {
     });
   });
 
-  describe('restoreTemplate', () => {
-    it('should resolve untracked items using restoreTemplate on a fields:[] array', async () => {
-      const field: ArrayField<unknown> = {
-        key: 'items',
-        type: 'array',
-        fields: [],
-        restoreTemplate: createSimpleTestField('item', 'Item'),
-      };
-
-      const { component, fixture } = setupArrayTest(field, { items: ['a', 'b', 'c'] });
-
-      await waitForItems(component, fixture, (n) => n >= 3);
-
-      expect(component.resolvedItems()).toHaveLength(3);
-    });
-
-    it('should resolve items past the defined fields using restoreTemplate', async () => {
-      const field: ArrayField<unknown> = {
-        key: 'items',
-        type: 'array',
-        fields: [[createSimpleTestField('item', 'Item', 'first')]],
-        restoreTemplate: [createSimpleTestField('item', 'Item')],
-      };
-
-      const { component, fixture } = setupArrayTest(field, { items: ['first', 'second', 'third'] });
-
-      await waitForItems(component, fixture, (n) => n >= 3);
-
-      expect(component.resolvedItems()).toHaveLength(3);
-    });
-
-    it('should warn and drop items when no restoreTemplate is configured', async () => {
+  describe('untracked items in form value', () => {
+    it('should warn and drop items on a full-API array when no template is available', async () => {
       const consoleSpy = vi.spyOn(console, 'warn');
 
       const field: ArrayField<unknown> = {
@@ -1371,10 +1341,53 @@ describe('ArrayFieldComponent', () => {
           type: 'array',
           template: { key: 'item', type: 'test', label: 'Item' },
           value: ['a'],
-        } as unknown as import('../../definitions/base/field-def').FieldDef<unknown>,
+        } as unknown as FieldDef<unknown>,
       ]);
 
       const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a', 'b', 'c'] });
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      expect(component.resolvedItems()).toHaveLength(3);
+    });
+
+    it('should resolve items for a simplified array with no initial value when the form value carries items', async () => {
+      const [normalized] = normalizeSimplifiedArrays([
+        {
+          key: 'items',
+          type: 'array',
+          template: { key: 'item', type: 'test', label: 'Item' },
+        } as unknown as FieldDef<unknown>,
+      ]);
+
+      const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a', 'b'] });
+
+      await waitForItems(component, fixture, (n) => n >= 2);
+
+      expect(component.resolvedItems()).toHaveLength(2);
+    });
+
+    it('should resolve items appended past the simplified array initial value when the form value grows', async () => {
+      const [normalized] = normalizeSimplifiedArrays([
+        {
+          key: 'items',
+          type: 'array',
+          template: { key: 'item', type: 'test', label: 'Item' },
+          value: ['a'],
+        } as unknown as FieldDef<unknown>,
+      ]);
+
+      const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a'] });
+      const context = TestBed.inject(FIELD_SIGNAL_CONTEXT) as FieldSignalContext<Record<string, unknown>>;
+
+      await waitForItems(component, fixture, (n) => n >= 1);
+      expect(component.resolvedItems()).toHaveLength(1);
+
+      // Grow the form value externally — the item added past the declared `value` length
+      // has no positional entry, so it must be resolved via the metadata fallback template.
+      context.value.set({ items: ['a', 'b', 'c'] });
+      fixture.detectChanges();
+      TestBed.flushEffects();
 
       await waitForItems(component, fixture, (n) => n >= 3);
 

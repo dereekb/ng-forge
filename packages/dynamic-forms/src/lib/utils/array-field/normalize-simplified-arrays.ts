@@ -162,21 +162,23 @@ function expandSimplifiedArray(field: SimplifiedArrayField): ExpandedArray {
   const arrayField = arrayFieldObj as unknown as FieldDef<unknown>;
 
   // Store normalization metadata via Symbol property instead of a runtime property.
-  // `restoreTemplate` always gets populated so the array component can resolve untracked
+  // `template` always gets populated so the array component can resolve untracked
   // items (e.g., from external form-value updates).
   //
   // For object templates, we must include the auto-generated remove button in the stored
-  // restoreTemplate because object arrays embed the button inside each item's fields (via
-  // buildObjectItem) rather than via the `autoRemoveButton` metadata. Without this, restored
-  // items would render without the remove button that originally-declared items have.
-  // Primitive templates keep the button as separate metadata and pass the raw template
-  // through — withAutoRemove() appends the button at resolution time from autoRemoveButton.
+  // template because object arrays embed the button inside each item's fields (via
+  // buildObjectItem) rather than via the `autoRemoveButton` metadata. Without this,
+  // items resolved from metadata would render without the remove button that
+  // originally-declared items have. Primitive templates keep the button as separate
+  // metadata and pass the raw template through — withAutoRemove() appends the button
+  // at resolution time from autoRemoveButton.
   const primitiveFieldKey = !isObjectTemplate ? (template as ArrayAllowedChildren).key : undefined;
-  const restoreTemplate = isObjectTemplate ? buildObjectItemTemplate(template as readonly ArrayAllowedChildren[], removeButton) : template;
+  const metadataTemplate = isObjectTemplate ? buildObjectItemTemplate(template as readonly ArrayAllowedChildren[], removeButton) : template;
+
   setNormalizedArrayMetadata(arrayFieldObj, {
     ...(hasAutoRemove && { autoRemoveButton: buildRemoveButton(removeButton) }),
     ...(primitiveFieldKey && { primitiveFieldKey }),
-    restoreTemplate,
+    template: metadataTemplate,
   });
 
   // Construct the add button (sibling, placed after the array)

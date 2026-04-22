@@ -27,7 +27,7 @@ export interface NormalizedArrayMetadata {
    * added through the event handlers and is not covered by a positional entry in
    * `fields` — e.g., items introduced by external form-value updates.
    */
-  readonly restoreTemplate?: ArrayAllowedChildren | readonly ArrayAllowedChildren[];
+  readonly template?: ArrayAllowedChildren | readonly ArrayAllowedChildren[];
 }
 
 /**

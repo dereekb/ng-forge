@@ -1,5 +1,6 @@
 import { ArrayFieldComponent } from './array-field.component';
 import { ArrayField } from '../../definitions/default/array-field';
+import { normalizeSimplifiedArrays } from '../../utils/array-field/normalize-simplified-arrays';
 import { RowField } from '../../definitions/default/row-field';
 import { delay } from '@ng-forge/utils';
 import { createSimpleTestField, TestFieldComponent } from '../../../../testing/src/simple-test-utils';
@@ -1304,6 +1305,93 @@ describe('ArrayFieldComponent', () => {
         const removeFields = item.fields.filter((f) => f.key === '__remove');
         expect(removeFields).toHaveLength(1);
       }
+    });
+  });
+
+  describe('untracked items in form value', () => {
+    it('should warn and drop items on a full-API array when no template is available', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn');
+
+      const field: ArrayField<unknown> = {
+        key: 'items',
+        type: 'array',
+        fields: [],
+      };
+
+      const { component, fixture } = setupArrayTest(field, { items: ['a'] });
+
+      await fixture.whenStable();
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      await delay(50);
+
+      expect(component.resolvedItems()).toHaveLength(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[Dynamic Forms]'),
+        expect.stringContaining('No template found for array item'),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should resolve items from SimplifiedArrayField.template via normalization metadata', async () => {
+      const [normalized] = normalizeSimplifiedArrays([
+        {
+          key: 'items',
+          type: 'array',
+          template: { key: 'item', type: 'test', label: 'Item' },
+          value: ['a'],
+        } as unknown as FieldDef<unknown>,
+      ]);
+
+      const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a', 'b', 'c'] });
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      expect(component.resolvedItems()).toHaveLength(3);
+    });
+
+    it('should resolve items for a simplified array with no initial value when the form value carries items', async () => {
+      const [normalized] = normalizeSimplifiedArrays([
+        {
+          key: 'items',
+          type: 'array',
+          template: { key: 'item', type: 'test', label: 'Item' },
+        } as unknown as FieldDef<unknown>,
+      ]);
+
+      const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a', 'b'] });
+
+      await waitForItems(component, fixture, (n) => n >= 2);
+
+      expect(component.resolvedItems()).toHaveLength(2);
+    });
+
+    it('should resolve items appended past the simplified array initial value when the form value grows', async () => {
+      const [normalized] = normalizeSimplifiedArrays([
+        {
+          key: 'items',
+          type: 'array',
+          template: { key: 'item', type: 'test', label: 'Item' },
+          value: ['a'],
+        } as unknown as FieldDef<unknown>,
+      ]);
+
+      const { component, fixture } = setupArrayTest(normalized as ArrayField<unknown>, { items: ['a'] });
+      const context = TestBed.inject(FIELD_SIGNAL_CONTEXT) as FieldSignalContext<Record<string, unknown>>;
+
+      await waitForItems(component, fixture, (n) => n >= 1);
+      expect(component.resolvedItems()).toHaveLength(1);
+
+      // Grow the form value externally — the item added past the declared `value` length
+      // has no positional entry, so it must be resolved via the metadata fallback template.
+      context.value.set({ items: ['a', 'b', 'c'] });
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      await waitForItems(component, fixture, (n) => n >= 3);
+
+      expect(component.resolvedItems()).toHaveLength(3);
     });
   });
 });

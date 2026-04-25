@@ -4,9 +4,7 @@ import { TestScenario } from '../../shared/types';
 /**
  * Verifies a `row` rendered inside a `container`. At runtime the row is
  * rewritten to a container with a synthesized `{ type: 'row' }` wrapper, so
- * this is effectively container-inside-container — confirms that nesting
- * works even though the static types in `ContainerAllowedChildren` allow
- * `RowField` but not `ContainerField`.
+ * this is effectively container-inside-container nesting.
  */
 const config = {
   fields: [

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { HiddenField, isHiddenField } from '../../definitions/default/hidden-field';
 import { FieldDef } from '../../definitions/base/field-def';
-import { validateRowNesting, RowField } from '../../definitions/default/row-field';
 
 describe('HiddenField', () => {
   describe('type definition', () => {
@@ -111,70 +110,6 @@ describe('HiddenField', () => {
       };
 
       expect(isHiddenField(field)).toBe(false);
-    });
-  });
-
-  describe('row nesting validation (warnings)', () => {
-    it('should detect hidden fields directly inside rows', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          { type: 'input', key: 'name', value: '' },
-          { type: 'hidden', key: 'id', value: '123' },
-        ],
-      } as RowField;
-
-      // Returns false when hidden fields are present (triggers warning)
-      expect(validateRowNesting(row)).toBe(false);
-    });
-
-    it('should detect hidden fields inside groups within rows', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          {
-            type: 'group',
-            key: 'data',
-            fields: [
-              { type: 'input', key: 'name', value: '' },
-              { type: 'hidden', key: 'id', value: '123' },
-            ],
-          },
-        ],
-      } as RowField;
-
-      // Returns false when hidden fields are present (triggers warning)
-      expect(validateRowNesting(row)).toBe(false);
-    });
-
-    it('should pass for rows without hidden fields', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          { type: 'input', key: 'firstName', value: '' },
-          { type: 'input', key: 'lastName', value: '' },
-        ],
-      } as RowField;
-
-      expect(validateRowNesting(row)).toBe(true);
-    });
-
-    it('should pass for rows with groups containing only visible fields', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          {
-            type: 'group',
-            key: 'name',
-            fields: [
-              { type: 'input', key: 'first', value: '' },
-              { type: 'input', key: 'last', value: '' },
-            ],
-          },
-        ],
-      } as RowField;
-
-      expect(validateRowNesting(row)).toBe(true);
     });
   });
 });

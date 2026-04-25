@@ -1,8 +1,8 @@
 import { LeafFieldTypes } from '../registry/field-registry';
+import type { PageField } from '../../definitions/default/page-field';
 import type { RowField } from '../../definitions/default/row-field';
 import type { GroupField } from '../../definitions/default/group-field';
 import type { ArrayField, SimplifiedArrayField } from '../../definitions/default/array-field';
-import type { HiddenField } from '../../definitions/default/hidden-field';
 import type { ContainerField } from '../../definitions/default/container-field';
 
 /**
@@ -33,12 +33,13 @@ export type ArrayAllowedChildren = LeafFieldTypes | RowField | GroupField | Cont
 
 /**
  * Fields that are allowed as children of Container fields.
- * Containers can contain: rows, groups, arrays, other containers, and leaf
- * fields (but NOT pages or hidden fields). Hidden fields are excluded
- * because containers are layout primitives and hidden fields don't render.
+ * Containers are pure layout primitives that flatten their children into the
+ * parent form, so any registered field type may appear inside — including
+ * pages, hidden fields, and other containers.
  */
 export type ContainerAllowedChildren =
-  | Exclude<LeafFieldTypes, HiddenField>
+  | LeafFieldTypes
+  | PageField
   | RowField
   | GroupField
   | ArrayField

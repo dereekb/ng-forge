@@ -4,9 +4,6 @@ import { TestScenario } from '../../shared/types';
 /**
  * Verifies a `container` rendered inside a `row`. At runtime the row is
  * itself a container, so this exercises container-inside-container nesting.
- * Currently disallowed by `RowAllowedChildren` (which excludes `ContainerField`)
- * — the cast lets the test run so we can confirm runtime behavior before
- * deciding whether to loosen the static type.
  */
 const config = {
   fields: [
@@ -34,7 +31,7 @@ const config = {
       col: 12,
     },
   ],
-} as unknown as FormConfig;
+} as const satisfies FormConfig;
 
 export const containerInsideRowScenario: TestScenario = {
   testId: 'container-inside-row',

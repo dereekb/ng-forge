@@ -19,13 +19,6 @@ import type { ContainerField } from '../../definitions/default/container-field';
 export type PageAllowedChildren = LeafFieldTypes | RowField | GroupField | ArrayField | SimplifiedArrayField | ContainerField;
 
 /**
- * Fields that are allowed as children of Row fields
- * Rows can contain: groups, arrays, and leaf fields (but NOT pages, other rows, or hidden fields)
- * Hidden fields are excluded because rows are for horizontal layouts and hidden fields don't render
- */
-export type RowAllowedChildren = Exclude<LeafFieldTypes, HiddenField> | GroupField | ArrayField | SimplifiedArrayField | ContainerField;
-
-/**
  * Fields that are allowed as children of Group fields
  * Groups can contain: rows and leaf fields (but NOT pages or other groups)
  */
@@ -39,8 +32,21 @@ export type GroupAllowedChildren = LeafFieldTypes | RowField | ContainerField;
 export type ArrayAllowedChildren = LeafFieldTypes | RowField | GroupField | ContainerField;
 
 /**
- * Fields that are allowed as children of Container fields
- * Containers follow the same rules as rows: groups, arrays, and leaf fields
- * (but NOT pages, rows, or hidden fields)
+ * Fields that are allowed as children of Container fields.
+ * Containers can contain: rows, groups, arrays, other containers, and leaf
+ * fields (but NOT pages or hidden fields). Hidden fields are excluded
+ * because containers are layout primitives and hidden fields don't render.
  */
-export type ContainerAllowedChildren = Exclude<LeafFieldTypes, HiddenField> | RowField | GroupField | ArrayField | SimplifiedArrayField;
+export type ContainerAllowedChildren =
+  | Exclude<LeafFieldTypes, HiddenField>
+  | RowField
+  | GroupField
+  | ArrayField
+  | SimplifiedArrayField
+  | ContainerField;
+
+/**
+ * Row is a synthetic field type that resolves to a Container at runtime, so
+ * it accepts the same children as a Container.
+ */
+export type RowAllowedChildren = ContainerAllowedChildren;

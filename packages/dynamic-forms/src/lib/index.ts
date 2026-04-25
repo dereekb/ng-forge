@@ -153,6 +153,7 @@ export type {
 // Utility Types
 export type {
   ArrayAllowedChildren,
+  ContainerAllowedChildren,
   FieldPathAccess,
   FormMode,
   FormModeDetectionResult,

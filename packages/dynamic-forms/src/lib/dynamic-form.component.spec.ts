@@ -29,8 +29,7 @@ type TestFormConfig = {
     | { type: 'group'; key: string; label: string; fields: any[] }
     | { type: 'page'; key: string; label?: string; fields: any[] }
     | { type: 'container'; key: string; fields: any[]; wrappers: any[] }
-    | { type: 'array'; key: string; fields: any[]; wrappers?: any[] }
-    | { type: 'array'; key: string; template: any; value?: any[]; wrappers?: any[] }
+    | { type: 'array'; key: string; template?: any; value?: any[]; wrappers?: any[] }
   >;
 };
 
@@ -2387,6 +2386,40 @@ describe('DynamicFormComponent', () => {
       const rowContainer = fixture.nativeElement.querySelector('[data-testid="nameRow"]');
       const rowElement = rowContainer?.querySelector('df-row-wrapper');
       expect(rowElement?.classList.contains('df-row')).toBe(true);
+    });
+
+    it('should handle container containing a container (children flattened through both)', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'outer',
+            type: 'container',
+            fields: [
+              {
+                key: 'inner',
+                type: 'container',
+                fields: [
+                  { key: 'firstName', type: 'input', label: 'First', value: 'Ada' },
+                  { key: 'lastName', type: 'input', label: 'Last', value: 'Lovelace' },
+                ],
+                wrappers: [],
+              },
+              { key: 'email', type: 'input', label: 'Email', value: 'ada@example.com' },
+            ],
+            wrappers: [],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { component, fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // Both outer and inner containers flatten — every leaf lives at the top level.
+      expect(component.formValue()).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+      });
     });
 
     it('should handle container containing a group with nested container', async () => {

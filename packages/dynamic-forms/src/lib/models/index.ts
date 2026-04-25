@@ -75,6 +75,7 @@ export type {
 // Types and helpers
 export type {
   ArrayAllowedChildren,
+  ContainerAllowedChildren,
   DynamicText,
   FieldPathAccess,
   FormMode,

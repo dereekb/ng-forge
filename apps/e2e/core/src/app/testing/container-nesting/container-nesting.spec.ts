@@ -107,6 +107,60 @@ test.describe('Container Nesting E2E Tests', () => {
     });
   });
 
+  test.describe('Row Inside Container', () => {
+    test('should render a row inside a container and submit the flat values', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/row-inside-container');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('row-inside-container');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const streetInput = scenario.locator('#street input');
+      await expect(streetInput).toBeVisible({ timeout: 5000 });
+      await streetInput.fill('500 Forge Ln');
+
+      const unitInput = scenario.locator('#unit input');
+      await expect(unitInput).toBeVisible({ timeout: 5000 });
+      await unitInput.fill('4B');
+
+      const cityInput = scenario.locator('#city input');
+      await expect(cityInput).toBeVisible({ timeout: 5000 });
+      await cityInput.fill('Springfield');
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      // Container + row are both layout-only — values flatten into the parent.
+      expect(data['street']).toBe('500 Forge Ln');
+      expect(data['unit']).toBe('4B');
+      expect(data['city']).toBe('Springfield');
+    });
+  });
+
+  test.describe('Container Inside Row', () => {
+    test('should render a container inside a row and submit the flat values', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/container-inside-row');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('container-inside-row');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const firstNameInput = scenario.locator('#firstName input');
+      await expect(firstNameInput).toBeVisible({ timeout: 5000 });
+      await firstNameInput.fill('Ada');
+
+      const nicknameInput = scenario.locator('#nickname input');
+      await expect(nicknameInput).toBeVisible({ timeout: 5000 });
+      await nicknameInput.fill('Lovelace');
+
+      const pronounsInput = scenario.locator('#pronouns input');
+      await expect(pronounsInput).toBeVisible({ timeout: 5000 });
+      await pronounsInput.fill('she/her');
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      // Row + container are both layout-only — values flatten into the parent.
+      expect(data['firstName']).toBe('Ada');
+      expect(data['nickname']).toBe('Lovelace');
+      expect(data['pronouns']).toBe('she/her');
+    });
+  });
+
   // Deeply nested (group > row > array > group) is a known library limitation.
   // Same issue as array-inside-group: arrays nested inside groups via rows don't render items.
   test.describe('Deeply Nested Containers', () => {

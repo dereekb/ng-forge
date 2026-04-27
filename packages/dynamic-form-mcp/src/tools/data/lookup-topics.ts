@@ -352,10 +352,8 @@ Included in form value but not rendered.
 
 Use \`col\` (1-12) on child fields for grid width. Row is purely for layout. Supports only \`hidden\` logic type for conditional visibility.
 
-**Allowed children:** groups, arrays, value fields (input, select, checkbox, etc.)
-**NOT allowed:** \`hidden\` fields, \`page\` containers, nested \`row\` containers
-
-⚠️ **Common mistake:** Putting hidden fields inside rows - hidden fields should be at page or form level, not in rows.`,
+**Allowed children:** groups, arrays, containers, nested rows, hidden fields, value fields (input, select, checkbox, etc.)
+**NOT allowed:** \`page\` containers`,
   },
 
   array: {
@@ -1671,7 +1669,7 @@ provideDynamicForm({
 | page | NO | hidden only | Nav buttons INSIDE |
 | group | NO | hidden only | Creates nested object |
 | array | NO | hidden only | Two APIs: \`template\`+\`value\` (simplified) or \`fields\` (full) |
-| row | NO | hidden only | Layout only, no hidden fields |`,
+| row | NO | hidden only | Layout only |`,
 
     full: `# Container Rules
 
@@ -1680,18 +1678,17 @@ provideDynamicForm({
 | page | NO | YES (hidden only) | rows, groups, arrays, leaf fields, buttons | Nav buttons go INSIDE |
 | group | NO | YES (hidden only) | rows, leaf fields (NOT pages, groups) | Creates nested object |
 | array | NO | YES (hidden only) | rows, groups, leaf fields (NOT pages, arrays) | Two APIs: \`template\`+\`value\` (simplified) or \`fields\` (full) |
-| row | NO | YES (hidden only) | groups, arrays, leaf fields (NOT hidden, pages, rows) | Layout only |
+| row | NO | YES (hidden only) | groups, arrays, containers, nested rows, hidden fields, leaf fields (NOT pages) | Layout only |
 
 **CRITICAL:**
 - All containers (page, group, row, array) support only the \`hidden\` logic type for conditional visibility.
 - For other logic types (disabled, required, readonly, derivation), apply them to child fields instead.
-- Hidden fields cannot be inside rows - place them at page/form level.
 - Pages cannot be nested - ALL top-level fields must be pages if using multi-page mode.`,
   },
 
   'field-placement': {
     brief: `**Multi-page:** ALL root fields must be pages. Hidden fields go INSIDE first page.
-**Rows:** NO hidden fields, NO nested rows, NO pages
+**Rows:** NO pages
 **Groups:** NO nested groups, NO pages`,
 
     full: `# Field Placement Rules

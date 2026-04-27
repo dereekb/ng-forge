@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { HiddenField, isHiddenField } from '../../definitions/default/hidden-field';
 import { FieldDef } from '../../definitions/base/field-def';
+import { RowField } from '../../definitions/default/row-field';
 
 describe('HiddenField', () => {
   describe('type definition', () => {
@@ -110,6 +111,50 @@ describe('HiddenField', () => {
       };
 
       expect(isHiddenField(field)).toBe(false);
+    });
+  });
+
+  describe('row container nesting (permissive)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    afterEach(() => {
+      warnSpy.mockClear();
+    });
+
+    it('accepts a hidden field as a direct child of a row without a cast', () => {
+      const row: RowField = {
+        type: 'row',
+        key: 'rowWithHidden',
+        fields: [
+          { type: 'text', key: 'label', label: 'Name' },
+          { type: 'hidden', key: 'id', value: '123' },
+        ],
+      };
+
+      const hiddenChild = row.fields.find((f) => f.type === 'hidden');
+      expect(hiddenChild).toBeDefined();
+      expect(hiddenChild && isHiddenField(hiddenChild)).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('accepts hidden fields nested inside groups within rows', () => {
+      const row: RowField = {
+        type: 'row',
+        key: 'rowWithGroup',
+        fields: [
+          {
+            type: 'group',
+            key: 'data',
+            fields: [
+              { type: 'text', key: 'label', label: 'Name' },
+              { type: 'hidden', key: 'id', value: '123' },
+            ],
+          },
+        ],
+      };
+
+      expect(row.fields).toHaveLength(1);
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 });

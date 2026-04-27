@@ -18,13 +18,6 @@ describe('ComponentInitializedEvent', () => {
       expect(event.componentId).toBe('page-1');
     });
 
-    it('should create event with row component type', () => {
-      const event = new ComponentInitializedEvent('row', 'row-1');
-
-      expect(event.componentType).toBe('row');
-      expect(event.componentId).toBe('row-1');
-    });
-
     it('should create event with group component type', () => {
       const event = new ComponentInitializedEvent('group', 'group-1');
 
@@ -67,7 +60,7 @@ describe('ComponentInitializedEvent', () => {
     });
 
     it('should be assignable to FormEvent array', () => {
-      const events: FormEvent[] = [new ComponentInitializedEvent('page', 'p1'), new ComponentInitializedEvent('row', 'r1')];
+      const events: FormEvent[] = [new ComponentInitializedEvent('page', 'p1'), new ComponentInitializedEvent('group', 'g1')];
 
       expect(events).toHaveLength(2);
       expect(events[0].type).toBe('component-initialized');
@@ -79,8 +72,8 @@ describe('ComponentInitializedEvent', () => {
     it('should allow modification of componentType', () => {
       const event = new ComponentInitializedEvent('page', 'page-1');
 
-      event.componentType = 'row';
-      expect(event.componentType).toBe('row');
+      event.componentType = 'group';
+      expect(event.componentType).toBe('group');
     });
 
     it('should allow modification of componentId', () => {
@@ -93,10 +86,9 @@ describe('ComponentInitializedEvent', () => {
 
   describe('Component type validation', () => {
     it('should handle all valid component types', () => {
-      const types: Array<'dynamic-form' | 'page' | 'row' | 'group' | 'array' | 'container'> = [
+      const types: Array<'dynamic-form' | 'page' | 'group' | 'array' | 'container'> = [
         'dynamic-form',
         'page',
-        'row',
         'group',
         'array',
         'container',
@@ -124,9 +116,9 @@ describe('ComponentInitializedEvent', () => {
     });
 
     it('should handle component IDs with special characters', () => {
-      const event = new ComponentInitializedEvent('row', 'row_123-abc.xyz');
+      const event = new ComponentInitializedEvent('container', 'container_123-abc.xyz');
 
-      expect(event.componentId).toBe('row_123-abc.xyz');
+      expect(event.componentId).toBe('container_123-abc.xyz');
     });
 
     it('should handle numeric-like component IDs', () => {
@@ -140,14 +132,14 @@ describe('ComponentInitializedEvent', () => {
     it('should track initialization of different component types', () => {
       const formEvent = new ComponentInitializedEvent('dynamic-form', 'main');
       const pageEvent = new ComponentInitializedEvent('page', 'step1');
-      const rowEvent = new ComponentInitializedEvent('row', 'row1');
       const groupEvent = new ComponentInitializedEvent('group', 'address');
+      const arrayEvent = new ComponentInitializedEvent('array', 'items');
       const containerEvent = new ComponentInitializedEvent('container', 'section1');
 
-      const events = [formEvent, pageEvent, rowEvent, groupEvent, containerEvent];
+      const events = [formEvent, pageEvent, groupEvent, arrayEvent, containerEvent];
 
       expect(events).toHaveLength(5);
-      expect(events.map((e) => e.componentType)).toEqual(['dynamic-form', 'page', 'row', 'group', 'container']);
+      expect(events.map((e) => e.componentType)).toEqual(['dynamic-form', 'page', 'group', 'array', 'container']);
     });
 
     it('should differentiate between same type components by ID', () => {

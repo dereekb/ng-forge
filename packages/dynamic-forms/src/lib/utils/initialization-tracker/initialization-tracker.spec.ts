@@ -16,7 +16,7 @@ describe('initialization-tracker', () => {
       // Dispatch 3 initialization events
       eventBus.dispatch(ComponentInitializedEvent, 'dynamic-form', 'form1');
       eventBus.dispatch(ComponentInitializedEvent, 'page', 'page1');
-      eventBus.dispatch(ComponentInitializedEvent, 'row', 'row1');
+      eventBus.dispatch(ComponentInitializedEvent, 'container', 'container1');
 
       const isComplete = await promise;
       expect(isComplete).toBe(true);
@@ -61,7 +61,7 @@ describe('initialization-tracker', () => {
       // Dispatch more than expected
       eventBus.dispatch(ComponentInitializedEvent, 'dynamic-form', 'form1');
       eventBus.dispatch(ComponentInitializedEvent, 'page', 'page1');
-      eventBus.dispatch(ComponentInitializedEvent, 'row', 'row1'); // Extra event
+      eventBus.dispatch(ComponentInitializedEvent, 'container', 'container1'); // Extra event
 
       const isComplete = await promise;
       expect(isComplete).toBe(true);
@@ -104,7 +104,7 @@ describe('initialization-tracker', () => {
 
       eventBus.dispatch(ComponentInitializedEvent, 'dynamic-form', 'form1');
       eventBus.dispatch(ComponentInitializedEvent, 'page', 'page1');
-      eventBus.dispatch(ComponentInitializedEvent, 'row', 'row1');
+      eventBus.dispatch(ComponentInitializedEvent, 'container', 'container1');
 
       const emissions = await emissionsPromise;
       expect(emissions).toEqual([
@@ -151,7 +151,7 @@ describe('initialization-tracker', () => {
 
       eventBus.dispatch(ComponentInitializedEvent, 'dynamic-form', 'form1');
       eventBus.dispatch(ComponentInitializedEvent, 'page', 'page1');
-      eventBus.dispatch(ComponentInitializedEvent, 'row', 'row1');
+      eventBus.dispatch(ComponentInitializedEvent, 'container', 'container1');
 
       const emissions = await emissionsPromise;
       expect(emissions[2]).toEqual({
@@ -169,7 +169,7 @@ describe('initialization-tracker', () => {
 
       // Dispatch 5 events
       for (let i = 1; i <= 5; i++) {
-        eventBus.dispatch(ComponentInitializedEvent, 'component', `comp${i}`);
+        eventBus.dispatch(ComponentInitializedEvent, 'container', `comp${i}`);
       }
 
       const emissions = await emissionsPromise;
@@ -203,9 +203,9 @@ describe('initialization-tracker', () => {
   });
 
   describe('integration scenarios', () => {
-    it('should work with typical form initialization (dynamic-form + 2 pages + row + group)', async () => {
+    it('should work with typical form initialization (dynamic-form + 2 pages + container + group)', async () => {
       const eventBus = new EventBus();
-      const expectedComponents = 5; // 1 dynamic-form + 2 pages + 1 row + 1 group
+      const expectedComponents = 5; // 1 dynamic-form + 2 pages + 1 container + 1 group
       const tracker$ = createInitializationTracker(eventBus, expectedComponents);
 
       const promise = firstValueFrom(tracker$);
@@ -213,7 +213,7 @@ describe('initialization-tracker', () => {
       eventBus.dispatch(ComponentInitializedEvent, 'dynamic-form', 'form1');
       eventBus.dispatch(ComponentInitializedEvent, 'page', 'page1');
       eventBus.dispatch(ComponentInitializedEvent, 'page', 'page2');
-      eventBus.dispatch(ComponentInitializedEvent, 'row', 'row1');
+      eventBus.dispatch(ComponentInitializedEvent, 'container', 'container1');
       eventBus.dispatch(ComponentInitializedEvent, 'group', 'group1');
 
       const isComplete = await promise;

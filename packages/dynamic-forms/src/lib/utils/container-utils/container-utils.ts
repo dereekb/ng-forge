@@ -25,9 +25,8 @@ export function computeContainerHostClasses(containerType: string, className: st
  * via afterNextRender to signal the container is ready.
  *
  * `componentType` may be a static value or a lazy getter — the latter lets
- * virtual field types (e.g. `row`, which renders via ContainerFieldComponent)
- * preserve their original type on the emitted event instead of collapsing to
- * the host component's type.
+ * virtual field types preserve their original type on the emitted event
+ * instead of collapsing to the host component's type.
  *
  * @param resolvedFields - Signal of resolved fields
  * @param eventBus - EventBus for dispatching initialization events

@@ -1,0 +1,4 @@
+{
+  "module": "../fesm2022/ng-forge-dynamic-forms-schema.mjs",
+  "typings": "../types/ng-forge-dynamic-forms-schema.d.ts"
+}

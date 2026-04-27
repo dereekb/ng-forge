@@ -136,6 +136,42 @@ describe('getFieldDefaultValue', () => {
       expect(result).toBeUndefined();
     });
 
+    it('should flatten page -> container -> container down to leaves', () => {
+      registry.set('container', { component: {} as any, valueHandling: 'flatten' });
+
+      const field: FieldDef<any> = {
+        type: 'page',
+        key: 'page1',
+        fields: [
+          {
+            type: 'container',
+            key: 'outer',
+            fields: [
+              {
+                type: 'container',
+                key: 'inner',
+                fields: [
+                  { type: 'input', key: 'firstName', value: 'Ada' },
+                  { type: 'input', key: 'lastName', value: 'Lovelace' },
+                ],
+                wrappers: [],
+              },
+              { type: 'input', key: 'email', value: 'ada@example.com' },
+            ],
+            wrappers: [],
+          },
+        ],
+      };
+      const result = getFieldDefaultValue(field, registry);
+
+      // page and both containers all flatten — leaves end up at the page's level.
+      expect(result).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+      });
+    });
+
     it('should return undefined for flatten field with no fields', () => {
       const field: FieldDef<any> = {
         type: 'row',
@@ -202,6 +238,42 @@ describe('getFieldDefaultValue', () => {
       const result = getFieldDefaultValue(field, registry);
 
       expect(result).toBeUndefined();
+    });
+
+    it('should flatten nested containers inside a group', () => {
+      registry.set('container', { component: {} as any, valueHandling: 'flatten' });
+
+      const field: FieldDef<any> = {
+        type: 'group',
+        key: 'user',
+        fields: [
+          {
+            type: 'container',
+            key: 'outer',
+            fields: [
+              {
+                type: 'container',
+                key: 'inner',
+                fields: [
+                  { type: 'input', key: 'firstName', value: 'Ada' },
+                  { type: 'input', key: 'lastName', value: 'Lovelace' },
+                ],
+                wrappers: [],
+              },
+              { type: 'input', key: 'email', value: 'ada@example.com' },
+            ],
+            wrappers: [],
+          },
+        ],
+      };
+      const result = getFieldDefaultValue(field, registry);
+
+      // Both container layers flatten — leaves live directly under the group.
+      expect(result).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+      });
     });
 
     it('should handle nested groups', () => {
@@ -439,6 +511,86 @@ describe('getFieldDefaultValue', () => {
       const result = getFieldDefaultValue(field, registry);
 
       expect(result).toEqual([{ id: '1', name: 'Bob' }]);
+    });
+
+    it('should flatten nested container children in object array items', () => {
+      registry.set('container', { component: {} as any, valueHandling: 'flatten' });
+
+      const field: FieldDef<any> = {
+        type: 'array',
+        key: 'items',
+        fields: [
+          [
+            {
+              type: 'container',
+              key: 'outer',
+              fields: [
+                {
+                  type: 'container',
+                  key: 'inner',
+                  fields: [
+                    { type: 'input', key: 'firstName', value: 'Ada' },
+                    { type: 'input', key: 'lastName', value: 'Lovelace' },
+                  ],
+                  wrappers: [],
+                },
+                { type: 'input', key: 'email', value: 'ada@example.com' },
+              ],
+              wrappers: [],
+            },
+          ],
+        ],
+      };
+      const result = getFieldDefaultValue(field, registry);
+
+      // Both container layers flatten — every leaf lives at the array item's top level.
+      expect(result).toEqual([
+        {
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          email: 'ada@example.com',
+        },
+      ]);
+    });
+
+    it('should flatten nested container children with underscore-prefixed keys in object array items', () => {
+      registry.set('container', { component: {} as any, valueHandling: 'flatten' });
+
+      const field: FieldDef<any> = {
+        type: 'array',
+        key: 'items',
+        fields: [
+          [
+            {
+              type: 'container',
+              key: '_outer',
+              fields: [
+                {
+                  type: 'container',
+                  key: '_inner',
+                  fields: [
+                    { type: 'input', key: '_firstName', value: 'Ada' },
+                    { type: 'input', key: '_lastName', value: 'Lovelace' },
+                  ],
+                  wrappers: [],
+                },
+                { type: 'input', key: '_email', value: 'ada@example.com' },
+              ],
+              wrappers: [],
+            },
+          ],
+        ],
+      };
+      const result = getFieldDefaultValue(field, registry);
+
+      // Underscore-prefixed keys must flatten the same way as ordinary keys.
+      expect(result).toEqual([
+        {
+          _firstName: 'Ada',
+          _lastName: 'Lovelace',
+          _email: 'ada@example.com',
+        },
+      ]);
     });
   });
 

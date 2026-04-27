@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { EventBus } from '../../events/event.bus';
 import { ComponentInitializedEvent } from '../../events/constants/component-initialized.event';
-import { createInitializationTracker, createDetailedInitializationTracker } from './initialization-tracker';
+import { createInitializationTracker } from './initialization-tracker';
 import { firstValueFrom } from 'rxjs';
-import { take, toArray } from 'rxjs/operators';
 
 describe('initialization-tracker', () => {
   describe('createInitializationTracker', () => {
@@ -218,21 +217,6 @@ describe('initialization-tracker', () => {
 
       const isComplete = await promise;
       expect(isComplete).toBe(true);
-    });
-
-    it('should handle detailed tracking for complex form', async () => {
-      const eventBus = new EventBus();
-      const tracker$ = createDetailedInitializationTracker(eventBus, 3);
-
-      const statusesPromise = firstValueFrom(tracker$.pipe(take(3), toArray()));
-
-      eventBus.dispatch(ComponentInitializedEvent, 'dynamic-form', 'mainForm');
-      eventBus.dispatch(ComponentInitializedEvent, 'page', 'personalInfo');
-      eventBus.dispatch(ComponentInitializedEvent, 'page', 'contactInfo');
-
-      const statuses = await statusesPromise;
-      expect(statuses.length).toBe(3);
-      expect(statuses[2].currentCount).toBe(3);
     });
   });
 });

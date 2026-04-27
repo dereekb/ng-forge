@@ -2,13 +2,7 @@ import { isWritableSignal, untracked } from '@angular/core';
 import type { FieldState, FieldTree } from '@angular/forms/signals';
 import type { FieldTreeRecord } from '../field-tree-utils';
 import { Logger } from '../../providers/features/logger/logger.interface';
-import { DerivationWarningTracker } from './derivation-warning-tracker';
-
-/**
- * Error message prefix for derivation-related errors.
- * @internal
- */
-const ERROR_PREFIX = '[Derivation]';
+import type { WarningTracker } from '../../utils/warning-tracker';
 
 /**
  * Navigates the form tree to resolve a field instance at the given path.
@@ -84,7 +78,7 @@ export function applyValueToForm(
   value: unknown,
   rootForm: FieldTree<unknown>,
   logger?: Logger,
-  warningTracker?: DerivationWarningTracker,
+  warningTracker?: WarningTracker,
 ): boolean {
   // Handle simple top-level fields
   if (!targetPath.includes('.')) {
@@ -139,7 +133,7 @@ function setFieldValue(
   fieldKey: string,
   value: unknown,
   logger?: Logger,
-  warningTracker?: DerivationWarningTracker,
+  warningTracker?: WarningTracker,
 ): boolean {
   const fieldAccessor = parent[fieldKey];
 
@@ -179,17 +173,17 @@ function setFieldValue(
  *
  * @internal
  */
-export function warnMissingField(fieldKey: string, logger?: Logger, warningTracker?: DerivationWarningTracker): void {
+export function warnMissingField(fieldKey: string, logger?: Logger, warningTracker?: WarningTracker): void {
   // If tracker is provided, check if we've already warned about this field
   if (warningTracker) {
-    if (warningTracker.warnedFields.has(fieldKey)) {
+    if (warningTracker.warnedKeys.has(fieldKey)) {
       return;
     }
-    warningTracker.warnedFields.add(fieldKey);
+    warningTracker.warnedKeys.add(fieldKey);
   }
 
   logger?.warn(
-    `${ERROR_PREFIX} Target field '${fieldKey}' not found in form. ` +
+    `Derivation: target field '${fieldKey}' not found in form. ` +
       `Ensure the field is defined in your form configuration. ` +
       `This warning is shown once per field.`,
   );

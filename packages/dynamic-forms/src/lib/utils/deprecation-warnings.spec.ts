@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { warnDeprecated } from './deprecation-warnings';
-import { createDeprecationWarningTracker, DeprecationWarningTracker } from './deprecation-warning-tracker';
+import { createWarningTracker, type WarningTracker } from './warning-tracker';
 import { createMockLogger, MockLogger } from '../../../testing/src/mock-logger';
 
 describe('deprecation-warnings', () => {
   let logger: MockLogger;
-  let tracker: DeprecationWarningTracker;
+  let tracker: WarningTracker;
 
   beforeEach(() => {
     logger = createMockLogger();
-    tracker = createDeprecationWarningTracker();
+    tracker = createWarningTracker();
   });
 
   describe('warnDeprecated', () => {
@@ -19,7 +19,7 @@ describe('deprecation-warnings', () => {
       warnDeprecated(logger, tracker, 'test-key', 'Test message');
 
       expect(logger.warn).toHaveBeenCalledOnce();
-      expect(logger.warn).toHaveBeenCalledWith('[Dynamic Forms] DEPRECATED: Test message');
+      expect(logger.warn).toHaveBeenCalledWith('DEPRECATED: Test message');
     });
 
     it('should fire only once per key (idempotent)', () => {
@@ -35,8 +35,8 @@ describe('deprecation-warnings', () => {
       warnDeprecated(logger, tracker, 'key-b', 'Message B');
 
       expect(logger.warn).toHaveBeenCalledTimes(2);
-      expect(logger.warn).toHaveBeenCalledWith('[Dynamic Forms] DEPRECATED: Message A');
-      expect(logger.warn).toHaveBeenCalledWith('[Dynamic Forms] DEPRECATED: Message B');
+      expect(logger.warn).toHaveBeenCalledWith('DEPRECATED: Message A');
+      expect(logger.warn).toHaveBeenCalledWith('DEPRECATED: Message B');
     });
 
     it('should track warned keys in the tracker', () => {

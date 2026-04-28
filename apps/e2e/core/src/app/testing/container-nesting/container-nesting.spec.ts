@@ -190,6 +190,29 @@ test.describe('Container Nesting E2E Tests', () => {
       const address = data['address'] as Record<string, unknown>;
       expect(address['state']).toBe('TX');
     });
+
+    test('should fire derivation when any sibling in the parent group changes via $group', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/container-inside-group-parent');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('container-inside-group-parent');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const countryInput = scenario.locator('#country input');
+      const stateInput = scenario.locator('#state input');
+      await expect(countryInput).toBeVisible({ timeout: 5000 });
+
+      // $group resolves to 'address' — fires the derivation on any sibling change.
+      await fillInput(countryInput, 'usa');
+      await expect(stateInput).toHaveValue('NY', { timeout: 5000 });
+
+      await fillInput(countryInput, 'canada');
+      await expect(stateInput).toHaveValue('ON', { timeout: 5000 });
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      const address = data['address'] as Record<string, unknown>;
+      expect(address['country']).toBe('canada');
+      expect(address['state']).toBe('ON');
+    });
   });
 
   // Deeply nested (group > row > array > group) is a known library limitation.

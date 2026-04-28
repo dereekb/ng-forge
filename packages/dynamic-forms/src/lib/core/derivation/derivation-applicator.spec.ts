@@ -1670,4 +1670,92 @@ describe('derivation-applicator', () => {
       expect(values.middleName).toBe(null);
     });
   });
+
+  describe('groupValue in evaluation context', () => {
+    let logger: Logger;
+    let formValueSignal: WritableSignal<Record<string, unknown>>;
+
+    beforeEach(() => {
+      logger = createMockLogger();
+      formValueSignal = signal({});
+    });
+
+    it('should populate groupValue with the parent group object for fields nested in a group', () => {
+      const { form } = createMockForm({ note: '' });
+      formValueSignal.set({ address: { country: 'usa', state: '' } });
+
+      let captured: unknown;
+      const captureFn = vi.fn().mockImplementation((ctx: { groupValue?: unknown }) => {
+        captured = ctx.groupValue;
+        return ctx.groupValue ? 'CAPTURED' : '';
+      });
+
+      const collection = createCollection([createEntry('address.state', { functionName: 'capture', dependsOn: ['*'] })]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        derivationFunctions: { capture: captureFn },
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+      };
+
+      applyDerivations(collection, context);
+
+      expect(captureFn).toHaveBeenCalled();
+      expect(captured).toEqual({ country: 'usa', state: '' });
+    });
+
+    it('should populate groupValue with the innermost parent group for nested groups', () => {
+      const { form } = createMockForm({ note: '' });
+      formValueSignal.set({ org: { address: { country: 'usa', state: '' } } });
+
+      let captured: unknown;
+      const captureFn = vi.fn().mockImplementation((ctx: { groupValue?: unknown }) => {
+        captured = ctx.groupValue;
+        return '';
+      });
+
+      const collection = createCollection([createEntry('org.address.state', { functionName: 'capture', dependsOn: ['*'] })]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        derivationFunctions: { capture: captureFn },
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+      };
+
+      applyDerivations(collection, context);
+
+      // Innermost parent is `address`, not `org`.
+      expect(captured).toEqual({ country: 'usa', state: '' });
+    });
+
+    it('should leave groupValue as undefined for fields at form root', () => {
+      const { form } = createMockForm({ rootField: '' });
+      formValueSignal.set({ rootField: 'foo' });
+
+      let captured: unknown = 'sentinel';
+      const captureFn = vi.fn().mockImplementation((ctx: { groupValue?: unknown }) => {
+        captured = ctx.groupValue;
+        return '';
+      });
+
+      const collection = createCollection([createEntry('rootField', { functionName: 'capture', dependsOn: ['*'] })]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        derivationFunctions: { capture: captureFn },
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+      };
+
+      applyDerivations(collection, context);
+
+      expect(captureFn).toHaveBeenCalled();
+      expect(captured).toBeUndefined();
+    });
+  });
 });

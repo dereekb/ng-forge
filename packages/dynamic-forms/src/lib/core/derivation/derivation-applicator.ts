@@ -504,16 +504,41 @@ function createEvaluationContext(
   const fieldAccessor = (context.rootForm as FieldTreeRecord)[entry.fieldKey];
   const fieldState = fieldAccessor ? readFieldStateInfo(fieldAccessor, false) : undefined;
 
+  // Parent group value: the absolute path with the trailing field segment
+  // dropped. `undefined` when the field is at form root.
+  const parentPath = getParentPathInScope(entry.fieldKey);
+  const groupValue = parentPath ? getNestedValue(formValue, parentPath) : undefined;
+
   return {
     fieldValue,
     formValue,
     fieldPath: entry.fieldKey,
+    groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,
     logger: context.logger,
     fieldState,
     formFieldState: chainContext.formFieldState,
   };
+}
+
+/**
+ * Returns the path to the parent of the given field path, expressed in the
+ * scope appropriate for the entry. Drops the last `.`-delimited segment.
+ * Returns `undefined` when the field has no parent in scope (e.g., a
+ * single-segment root key, or `'items.$.x'` inside the array-item scope
+ * where `x` is a direct child of the item).
+ *
+ * For non-array entries: `'address.state'` → `'address'`, `'state'` → undefined.
+ * For array entries inside `createEvaluationContext` (root scope): unused —
+ * `createArrayItemEvaluationContext` handles the array-scope case.
+ *
+ * @internal
+ */
+function getParentPathInScope(fieldKey: string): string | undefined {
+  const lastDot = fieldKey.lastIndexOf('.');
+  if (lastDot <= 0) return undefined;
+  return fieldKey.slice(0, lastDot);
 }
 
 /**
@@ -558,10 +583,20 @@ function createArrayItemEvaluationContext(
     }
   }
 
+  // groupValue inside an array item:
+  // - Field directly under the array item (no inner group): the array item
+  //   itself is the "nearest parent group".
+  // - Field inside an inner group within the item: the inner group's value.
+  // The relative path within the item is everything after `'.$.'`.
+  const relativePath = pathInfo.isArrayPath ? (pathInfo.relativePath ?? '') : '';
+  const innerParentPath = relativePath.includes('.') ? relativePath.slice(0, relativePath.lastIndexOf('.')) : '';
+  const groupValue = innerParentPath ? getNestedValue(arrayItem, innerParentPath) : arrayItem;
+
   return {
     fieldValue: arrayItem,
     formValue: arrayItem,
     fieldPath: `${arrayPath}.${itemIndex}`,
+    groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,
     logger: context.logger,

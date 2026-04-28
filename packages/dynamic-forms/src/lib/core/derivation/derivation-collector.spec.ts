@@ -252,7 +252,7 @@ describe('derivation-collector', () => {
         expect(collection.entries[0].fieldKey).toBe('address.state');
       });
 
-      it('should reset groupPath at array boundaries (array preserves array.$.fieldKey form)', () => {
+      it('should reset ancestor groupPath at array boundaries (array preserves array.$.fieldKey form)', () => {
         const fields: FieldDef<unknown>[] = [
           {
             key: 'org',
@@ -276,8 +276,38 @@ describe('derivation-collector', () => {
         const collection = collectDerivations(fields);
 
         expect(collection.entries.length).toBe(1);
-        // Array boundary resets groupPath; entry uses array placeholder form.
+        // Ancestor `org` is dropped at the array boundary; the entry uses
+        // the array placeholder form for descendants of the array item.
         expect(collection.entries[0].fieldKey).toBe('items.$.name');
+      });
+
+      it('should combine arrayPath and inner groupPath (array > group > input)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'items',
+            type: 'array',
+            fields: [
+              {
+                key: 'address',
+                type: 'group',
+                fields: [
+                  {
+                    key: 'state',
+                    type: 'text',
+                    derivation: 'formValue.foo',
+                  } as TextFieldDef,
+                ],
+              } as GroupFieldDef,
+            ],
+          } as ArrayFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        // Group inside an array contributes to the entry path so writeback
+        // hits the actual schema location: items[i].address.state.
+        expect(collection.entries[0].fieldKey).toBe('items.$.address.state');
       });
 
       it('should collect derivations from array fields with array path', () => {
@@ -789,6 +819,397 @@ describe('derivation-collector', () => {
         expect(collection.entries[0].dependsOn).toEqual(['foo']);
         expect(collection.entries[0].dependsOn).not.toContain('$self');
         expect(collection.entries[0].dependsOn).not.toContain('note');
+      });
+    });
+
+    describe('$group dependency token', () => {
+      it('should resolve $group to the immediate parent group path', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'state',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    functionName: 'computeFromGroup',
+                    dependsOn: ['$group'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('address.state');
+        expect(collection.entries[0].dependsOn).toEqual(['address']);
+      });
+
+      it('should resolve $group to the nearest parent group fully qualified (group > group > input)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'org',
+            type: 'group',
+            fields: [
+              {
+                key: 'address',
+                type: 'group',
+                fields: [
+                  {
+                    key: 'state',
+                    type: 'text',
+                    logic: [
+                      {
+                        type: 'derivation',
+                        functionName: 'computeFromGroup',
+                        dependsOn: ['$group'],
+                      },
+                    ],
+                  } as TextFieldDef,
+                ],
+              } as GroupFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('org.address.state');
+        expect(collection.entries[0].dependsOn).toEqual(['org.address']);
+      });
+
+      it('should resolve $group to the array key when directly inside an array', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'items',
+            type: 'array',
+            fields: [
+              {
+                key: 'name',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    functionName: 'computeFromArray',
+                    dependsOn: ['$group'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as ArrayFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('items.$.name');
+        expect(collection.entries[0].dependsOn).toEqual(['items']);
+      });
+
+      it('should resolve $group to the combined array+group path (array > group > input)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'items',
+            type: 'array',
+            fields: [
+              {
+                key: 'address',
+                type: 'group',
+                fields: [
+                  {
+                    key: 'state',
+                    type: 'text',
+                    logic: [
+                      {
+                        type: 'derivation',
+                        functionName: 'computeFromAddressGroup',
+                        dependsOn: ['$group'],
+                      },
+                    ],
+                  } as TextFieldDef,
+                ],
+              } as GroupFieldDef,
+            ],
+          } as ArrayFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('items.$.address.state');
+        expect(collection.entries[0].dependsOn).toEqual(['items.$.address']);
+      });
+
+      it('should preserve other dependencies when $group is mixed with $self and absolute paths', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'state',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    functionName: 'compute',
+                    dependsOn: ['$group', '$self', 'externalKey'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].dependsOn).toEqual(['address', 'address.state', 'externalKey']);
+      });
+
+      it('should throw DynamicFormError when $group is used at form root', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'state',
+            type: 'text',
+            logic: [
+              {
+                type: 'derivation',
+                functionName: 'compute',
+                dependsOn: ['$group'],
+              },
+            ],
+          } as TextFieldDef,
+        ];
+
+        expect(() => collectDerivations(fields)).toThrow(/has no parent group or array/);
+      });
+
+      it('should resolve $group for HTTP derivations (passes the dependsOn validity guards)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'state',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    source: 'http',
+                    http: { url: '/api/lookup' },
+                    responseExpression: 'response.value',
+                    dependsOn: ['$group'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].dependsOn).toEqual(['address']);
+      });
+
+      it('should NOT extract a literal $group from a shorthand expression — token is dependsOn-only', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'note',
+                type: 'text',
+                derivation: 'formValue.foo + "$group"',
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        // Shorthand deps come from extractStringDependencies(expression)
+        // — it only matches `formValue.X`, so `$group` literal is ignored.
+        expect(collection.entries[0].dependsOn).toEqual(['foo']);
+        expect(collection.entries[0].dependsOn).not.toContain('$group');
+        expect(collection.entries[0].dependsOn).not.toContain('address');
+      });
+    });
+
+    describe('token prefix substitution ($group.sibling and $self.X)', () => {
+      it('should resolve $group.sibling to <parentPath>.sibling inside a group', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'state',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    functionName: 'pickFromCountry',
+                    dependsOn: ['$group.country'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('address.state');
+        expect(collection.entries[0].dependsOn).toEqual(['address.country']);
+      });
+
+      it('should resolve $group.sibling for nested groups (joining the fully qualified parent)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'org',
+            type: 'group',
+            fields: [
+              {
+                key: 'address',
+                type: 'group',
+                fields: [
+                  {
+                    key: 'state',
+                    type: 'text',
+                    logic: [
+                      {
+                        type: 'derivation',
+                        functionName: 'pickFromCountry',
+                        dependsOn: ['$group.country'],
+                      },
+                    ],
+                  } as TextFieldDef,
+                ],
+              } as GroupFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].dependsOn).toEqual(['org.address.country']);
+      });
+
+      it('should resolve $group.sibling inside arrays (joining the array placeholder path)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'items',
+            type: 'array',
+            fields: [
+              {
+                key: 'address',
+                type: 'group',
+                fields: [
+                  {
+                    key: 'state',
+                    type: 'text',
+                    logic: [
+                      {
+                        type: 'derivation',
+                        functionName: 'pickFromCountry',
+                        dependsOn: ['$group.country'],
+                      },
+                    ],
+                  } as TextFieldDef,
+                ],
+              } as GroupFieldDef,
+            ],
+          } as ArrayFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].dependsOn).toEqual(['items.$.address.country']);
+      });
+
+      it('should resolve multi-segment $group prefixes ($group.foo.bar)', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'state',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    functionName: 'compute',
+                    dependsOn: ['$group.contact.email'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries[0].dependsOn).toEqual(['address.contact.email']);
+      });
+
+      it('should resolve $self.subProperty to <fieldKey>.subProperty', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                key: 'meta',
+                type: 'text',
+                logic: [
+                  {
+                    type: 'derivation',
+                    functionName: 'compute',
+                    dependsOn: ['$self.flag'],
+                  },
+                ],
+              } as TextFieldDef,
+            ],
+          } as GroupFieldDef,
+        ];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries[0].dependsOn).toEqual(['address.meta.flag']);
+      });
+
+      it('should throw DynamicFormError when $group.sibling is used at form root', () => {
+        const fields: FieldDef<unknown>[] = [
+          {
+            key: 'state',
+            type: 'text',
+            logic: [
+              {
+                type: 'derivation',
+                functionName: 'compute',
+                dependsOn: ['$group.country'],
+              },
+            ],
+          } as TextFieldDef,
+        ];
+
+        expect(() => collectDerivations(fields)).toThrow(/has no parent group or array/);
       });
     });
   });

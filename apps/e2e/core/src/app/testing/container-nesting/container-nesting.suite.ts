@@ -6,6 +6,7 @@ import { rowInsideContainerScenario } from './scenarios/row-inside-container.sce
 import { containerInsideRowScenario } from './scenarios/container-inside-row.scenario';
 import { containerInsideGroupScenario } from './scenarios/container-inside-group.scenario';
 import { containerInsideGroupSelfScenario } from './scenarios/container-inside-group-self.scenario';
+import { containerInsideGroupParentScenario } from './scenarios/container-inside-group-parent.scenario';
 import { deeplyNestedScenario } from './scenarios/deeply-nested.scenario';
 
 /**
@@ -27,6 +28,7 @@ export const containerNestingSuite: TestSuite = {
     containerInsideRowScenario,
     containerInsideGroupScenario,
     containerInsideGroupSelfScenario,
+    containerInsideGroupParentScenario,
     deeplyNestedScenario,
   ],
 };

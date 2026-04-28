@@ -19,6 +19,27 @@ import { DerivationCollection, DerivationEntry } from './derivation-types';
 export const SELF_DEPENDENCY_TOKEN = '$self';
 
 /**
+ * Token in `dependsOn` arrays that resolves to the absolute path of the
+ * field's nearest parent container (group or array) at collection time.
+ *
+ * Useful when a derivation should fire whenever any sibling under the
+ * same parent container changes (e.g. "compute when anything in the
+ * address group is edited") without enumerating each sibling explicitly.
+ *
+ * Resolution rules:
+ * - Inside group(s) only: resolves to the dotted ancestor group path
+ *   (e.g. `'address'` or `'org.address'`).
+ * - Inside an array (no group between): resolves to the array key
+ *   (e.g. `'items'`). Fires whenever any item changes.
+ * - Inside group(s) inside an array: resolves to the array placeholder
+ *   form including the inner groups (e.g. `'items.$.address'`).
+ * - At form root: throws `DynamicFormError` (no parent to target).
+ *
+ * @public
+ */
+export const GROUP_DEPENDENCY_TOKEN = '$group';
+
+/**
  * Context for collecting derivations, tracking the current array and group
  * paths so absolute field paths can be reconstructed for entries.
  *
@@ -145,15 +166,23 @@ function traverseFields(fields: FieldDef<unknown>[], entries: DerivationEntry[],
  * Builds the absolute field path for a derivation entry from the field's
  * key and the current collection context.
  *
- * - Inside an array, returns `${arrayPath}.$.${fieldKey}` (the placeholder
- *   form already used by the rest of the system). `groupPath` is reset at
- *   array boundaries, so this branch never combines them.
- * - Inside one or more groups, returns `${groupPath}.${fieldKey}`.
+ * - Inside an array AND inside one or more groups (groups nested under
+ *   the array item): combines both as `${arrayPath}.$.${groupPath}.${fieldKey}`.
+ * - Inside an array only: returns `${arrayPath}.$.${fieldKey}`.
+ * - Inside one or more groups: returns `${groupPath}.${fieldKey}`.
  * - Otherwise returns `fieldKey` unchanged.
+ *
+ * `groupPath` is reset when entering an array (each array item is its own
+ * model root); ancestor groups OUTSIDE the array are not part of the
+ * entry path. Groups INSIDE the array are tracked via `groupPath` and
+ * combined here.
  *
  * @internal
  */
 function buildEffectiveFieldKey(fieldKey: string, context: CollectionContext): string {
+  if (context.arrayPath && context.groupPath) {
+    return `${context.arrayPath}.$.${context.groupPath}.${fieldKey}`;
+  }
   if (context.arrayPath) {
     return `${context.arrayPath}.$.${fieldKey}`;
   }
@@ -164,13 +193,56 @@ function buildEffectiveFieldKey(fieldKey: string, context: CollectionContext): s
 }
 
 /**
- * Replaces occurrences of `SELF_DEPENDENCY_TOKEN` in a `dependsOn` array
- * with the field's own resolved absolute path.
+ * Resolves the absolute path of the field's nearest parent container
+ * (group or array). Returns `undefined` when the field is at the form
+ * root with no parent container.
  *
  * @internal
  */
-function resolveSelfDependencies(deps: string[], effectiveFieldKey: string): string[] {
-  return deps.map((dep) => (dep === SELF_DEPENDENCY_TOKEN ? effectiveFieldKey : dep));
+function buildNearestGroupPath(context: CollectionContext): string | undefined {
+  if (context.arrayPath && context.groupPath) {
+    return `${context.arrayPath}.$.${context.groupPath}`;
+  }
+  return context.arrayPath ?? context.groupPath;
+}
+
+/**
+ * Substitutes special tokens in a `dependsOn` array with their resolved
+ * absolute paths. Currently supports:
+ *
+ * - `SELF_DEPENDENCY_TOKEN` ('$self') → the field's own absolute path
+ * - `'$self.X'` → the field's own path joined with `.X` (e.g. for object-valued
+ *   fields where you want to depend on a sub-property)
+ * - `GROUP_DEPENDENCY_TOKEN` ('$group') → the field's nearest parent
+ *   container path; throws if the field has no parent group/array.
+ * - `'$group.sibling'` → the parent path joined with `.sibling`, useful to
+ *   target a specific sibling without naming the parent group key.
+ *
+ * Non-token strings are passed through unchanged.
+ *
+ * @internal
+ */
+function resolveTokenDependencies(deps: string[], effectiveFieldKey: string, context: CollectionContext): string[] {
+  return deps.map((dep) => {
+    if (dep === SELF_DEPENDENCY_TOKEN) {
+      return effectiveFieldKey;
+    }
+    if (dep.startsWith(`${SELF_DEPENDENCY_TOKEN}.`)) {
+      return effectiveFieldKey + dep.slice(SELF_DEPENDENCY_TOKEN.length);
+    }
+    if (dep === GROUP_DEPENDENCY_TOKEN || dep.startsWith(`${GROUP_DEPENDENCY_TOKEN}.`)) {
+      const groupPath = buildNearestGroupPath(context);
+      if (!groupPath) {
+        throw new DynamicFormError(
+          `Derivation for '${effectiveFieldKey}' uses '${dep}' but the field has no parent group or array. ` +
+            `'${GROUP_DEPENDENCY_TOKEN}' is only valid for fields nested inside a group or array container.`,
+        );
+      }
+      if (dep === GROUP_DEPENDENCY_TOKEN) return groupPath;
+      return groupPath + dep.slice(GROUP_DEPENDENCY_TOKEN.length);
+    }
+    return dep;
+  });
 }
 
 /**
@@ -276,7 +348,7 @@ function createLogicEntry(fieldKey: string, config: DerivationLogicConfig, conte
     }
   }
 
-  const dependsOn = resolveSelfDependencies(extractDependencies(config), effectiveFieldKey);
+  const dependsOn = resolveTokenDependencies(extractDependencies(config), effectiveFieldKey, context);
   const condition = config.condition ?? true;
   const trigger = config.trigger ?? 'onChange';
 

@@ -783,9 +783,12 @@ logic: [{ type: 'derivation', source: 'http', http: { url: '/api/rate', queryPar
 
 // Self-dependency token: $self resolves to the field's own absolute path at collection time
 logic: [{ type: 'derivation', functionName: 'uppercase', dependsOn: ['$self'] }]
+
+// Parent-container token: $group resolves to the field's nearest parent group/array path
+logic: [{ type: 'derivation', functionName: 'computeFromGroup', dependsOn: ['$group'] }]
 \`\`\`
 Derivation is always defined ON the field that receives the computed value (self-targeting).
-\`dependsOn\` paths are absolute from the form root (e.g. \`'address.state'\`). Use \`'$self'\` to refer to the field's own absolute path without hard-coding ancestor group keys.
+\`dependsOn\` paths are absolute from the form root (e.g. \`'address.state'\`). Use \`'$self'\` for the field's own absolute path and \`'$group'\` for its nearest parent group/array — both useful in factory-built fields where ancestor keys aren't known at config time.
 **Variables:** \`formValue\`, \`fieldValue\`, \`fieldState\`, \`formFieldState\`, \`externalData\` (see topic: expression-variables)
 **For deriving component properties** (minDate, options, label): use \`targetProperty\` (see topic \`property-derivation\`)`,
 
@@ -887,6 +890,60 @@ Use \`'$self'\` in \`dependsOn\` to refer to the field's own absolute path. Usef
 \`\`\`
 
 \`$self\` works alongside other absolute deps and inside arrays (resolves to the array placeholder form, e.g. \`'items.$.name'\`).
+
+### \`$group\` token
+
+Use \`'$group'\` in \`dependsOn\` to refer to the field's **nearest parent container** (group or array). The derivation fires whenever any sibling under the same parent changes — handy when you don't want to enumerate each sibling explicitly:
+
+\`\`\`typescript
+{
+  type: 'group', key: 'address',
+  fields: [
+    { key: 'country', type: 'input' },
+    { key: 'state', type: 'input', logic: [{
+      type: 'derivation',
+      functionName: 'pickStateFromCountry',
+      dependsOn: ['$group']  // resolves to 'address' at collection time
+    }]}
+  ]
+}
+\`\`\`
+
+Resolution rules:
+- Inside group(s) only → the dotted ancestor group path (\`'address'\` or \`'org.address'\`).
+- Directly inside an array → the array key (\`'items'\`). Fires on any item change.
+- Inside group(s) inside an array → \`'items.$.address'\` form.
+- At form root → throws \`DynamicFormError\` (no parent container exists).
+
+### Token prefix substitution
+
+Both \`$self\` and \`$group\` accept a dotted suffix that is appended to the resolved path:
+
+\`\`\`typescript
+dependsOn: ['$group.country']  // resolves to 'address.country' inside group 'address'
+dependsOn: ['$group.contact.email']  // multi-segment suffix supported
+dependsOn: ['$self.flag']  // resolves to '<fieldKey>.flag' (object-valued fields)
+\`\`\`
+
+Use this to target a specific sibling without naming the parent group key — handy in factory-built field shapes.
+
+### \`groupValue\` in evaluation context
+
+Custom derivation functions and expressions receive a \`groupValue\` on the \`EvaluationContext\` that mirrors the \`$group\` token at evaluation time:
+
+\`\`\`typescript
+deriveStateFromCountry: (ctx) => {
+  const country = ctx.groupValue?.country;  // no need to know the parent key
+  return country === 'usa' ? 'NY' : '';
+}
+\`\`\`
+
+Population rules:
+- Inside a group: the parent group's value object.
+- Inside nested groups: the innermost parent group's value.
+- Directly inside an array item (no inner group): the array item itself (same as \`formValue\` in array context).
+- Inside a group inside an array item: the inner group's value within the item.
+- Field at form root: \`undefined\`.
 
 ## HTTP Derivation (Server-Driven Values)
 

@@ -10,7 +10,7 @@ export type {
 export { createEmptyDerivationCollection, createDerivationChainContext, createDerivationKey, parseDerivationKey } from './derivation-types';
 
 // Collector
-export { collectDerivations, SELF_DEPENDENCY_TOKEN } from './derivation-collector';
+export { collectDerivations, SELF_DEPENDENCY_TOKEN, GROUP_DEPENDENCY_TOKEN } from './derivation-collector';
 
 // Cycle detection
 export { detectCycles, validateNoCycles } from './cycle-detector';

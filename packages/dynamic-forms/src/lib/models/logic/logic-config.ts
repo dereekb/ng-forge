@@ -383,6 +383,11 @@ interface HttpDerivationBase extends SharedDerivationFields {
   /**
    * Explicit field dependencies. Required for HTTP derivations to prevent
    * wildcard triggering on every keystroke.
+   *
+   * The wildcard token `'*'` is rejected. The structural token `'$group'`
+   * (and `'$group.X'`) is allowed and resolves to the field's parent container
+   * path — be aware this fires whenever any sibling under that group changes,
+   * so the caller owns the request frequency (consider `trigger: 'debounced'`).
    */
   dependsOn: string[];
   /**
@@ -440,6 +445,12 @@ interface AsyncFunctionDerivationBase extends SharedDerivationFields {
   /**
    * Explicit field dependencies. Required for async derivations to prevent
    * wildcard triggering on every form change.
+   *
+   * The wildcard token `'*'` is rejected. The structural token `'$group'`
+   * (and `'$group.X'`) is allowed and resolves to the field's parent container
+   * path — be aware this fires whenever any sibling under that group changes,
+   * so the caller owns the invocation frequency (handle this via
+   * `trigger: 'debounced'` or via debouncing inside the async function).
    */
   dependsOn: string[];
   // Mutual exclusivity: other sources are not allowed

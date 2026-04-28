@@ -318,6 +318,12 @@ function createLogicEntry(fieldKey: string, config: DerivationLogicConfig, conte
   // Runtime guards for HTTP and async derivations.
   // Mutual exclusivity and required fields are now enforced by TypeScript (via `source` discriminant).
   // The wildcard and empty-array checks below are not expressible in the type system.
+  //
+  // Note: `$group` / `$group.X` tokens are intentionally allowed for HTTP and async sources even
+  // though they resolve to the parent path and therefore fire on any sibling change inside that
+  // group/array. Unlike `*`, the token is structurally scoped (collection throws if the field has
+  // no parent container) and an explicit opt-in. Consumers that want to bound request frequency
+  // can use `trigger: 'debounced'` here, or rely on debouncing inside their async function.
   if (config.source === 'http') {
     if (config.dependsOn.length === 0) {
       throw new DynamicFormError(

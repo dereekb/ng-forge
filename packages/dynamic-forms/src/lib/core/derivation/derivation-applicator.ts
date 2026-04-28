@@ -591,11 +591,15 @@ function createArrayItemEvaluationContext(
   const relativePath = pathInfo.isArrayPath ? (pathInfo.relativePath ?? '') : '';
   const innerParentPath = relativePath.includes('.') ? relativePath.slice(0, relativePath.lastIndexOf('.')) : '';
   const groupValue = innerParentPath ? getNestedValue(arrayItem, innerParentPath) : arrayItem;
+  // Resolve fieldValue to the leaf value addressed by the entry's relative path
+  // within the array item. Without this, $self / fieldValue derivations inside
+  // arrays receive the whole array item instead of the field's own value.
+  const fieldValue = relativePath ? getNestedValue(arrayItem, relativePath) : arrayItem;
 
   return {
-    fieldValue: arrayItem,
+    fieldValue,
     formValue: arrayItem,
-    fieldPath: `${arrayPath}.${itemIndex}`,
+    fieldPath: relativePath ? `${arrayPath}.${itemIndex}.${relativePath}` : `${arrayPath}.${itemIndex}`,
     groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,

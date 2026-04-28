@@ -681,6 +681,70 @@ test.describe('Value Derivation Logic Tests', () => {
     });
   });
 
+  test.describe('Array Field $self Derivation (No Row Wrapper)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(testUrl('/test/derivation-logic/array-field-self-derivation'));
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('should fire $self-resolved derivation on each array item independently from initial values', async ({ page, helpers }) => {
+      const scenario = helpers.getScenario('array-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      const nameInputs = scenario.locator('[id^="name"] input');
+      await expect(nameInputs).toHaveCount(2);
+
+      // Initial values 'first' / 'second' should be uppercased by the derivation
+      // resolved from `dependsOn: ['$self']` against `items.$.name`.
+      await expect(nameInputs.nth(0)).toHaveValue('FIRST');
+      await expect(nameInputs.nth(1)).toHaveValue('SECOND');
+    });
+
+    test('should fire $self derivation when user edits an array item field', async ({ page, helpers }) => {
+      const scenario = helpers.getScenario('array-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      const nameInputs = scenario.locator('[id^="name"] input');
+      const firstName = nameInputs.nth(0);
+      const secondName = nameInputs.nth(1);
+
+      await expect(firstName).toHaveValue('FIRST');
+
+      // Edit first item — derivation should uppercase the new value
+      await helpers.clearAndFill(firstName, 'hello');
+      await page.waitForTimeout(500);
+      await expect(firstName).toHaveValue('HELLO');
+
+      // Second item should be unaffected
+      await expect(secondName).toHaveValue('SECOND');
+
+      // Edit second item — derivation should fire independently for that item
+      await helpers.clearAndFill(secondName, 'world');
+      await page.waitForTimeout(500);
+      await expect(secondName).toHaveValue('WORLD');
+      await expect(firstName).toHaveValue('HELLO');
+    });
+
+    test('should fire $self derivation on a newly added array item', async ({ page, helpers }) => {
+      const scenario = helpers.getScenario('array-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      const nameInputs = scenario.locator('[id^="name"] input');
+      const addButton = scenario.locator('#addItem button');
+
+      await expect(nameInputs).toHaveCount(2);
+
+      await addButton.click();
+      await page.waitForTimeout(500);
+      await expect(nameInputs).toHaveCount(3);
+
+      const newName = nameInputs.nth(2);
+      await helpers.clearAndFill(newName, 'fresh');
+      await page.waitForTimeout(500);
+      await expect(newName).toHaveValue('FRESH');
+    });
+  });
+
   test.describe('Derivation in Group', () => {
     test.skip(true, 'Library limitation: derivation expressions inside group containers do not evaluate correctly');
     test('should derive fullName from firstName and lastName inside a group', async ({ page, helpers }) => {

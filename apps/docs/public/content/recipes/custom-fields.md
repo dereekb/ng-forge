@@ -79,7 +79,7 @@ const config = {
 
 - Custom fields work with all conditional logic, validation, and value derivation — no special handling needed
 - You can add as many custom fields as you need alongside any adapter
-- The `mapper` function translates the resolved field to your component's inputs — use `valueFieldMapper` for standard value-based fields or `checkboxFieldMapper` for boolean fields
+- The `mapper` function translates the resolved field to your component's inputs — there are multiple available mappers like `valueFieldMapper` for standard value-based fields, `optionsFieldMapper` for option fields, `datepickerFieldMapper` for date fields, `checkboxFieldMapper` for boolean fields, and more. You can also write your own custom mapper if needed.
 - If your custom component declares `field = input.required(...)`, the renderer waits for `field` automatically when using a built-in mapper. Use explicit `renderReadyWhen: ['field']` only for custom mappers that supply other reactive inputs, or `renderReadyWhen: []` to opt out
 
 ## Going Further

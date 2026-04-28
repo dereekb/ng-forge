@@ -153,7 +153,7 @@ renderReadyWhen: ['field', 'title'];
 renderReadyWhen: ['items'];
 ```
 
-> **Convention:** When using built-in mappers (`valueFieldMapper`, `checkboxFieldMapper`, etc.), `renderReadyWhen: ['field']` is applied automatically if your component needs the `field` input. You only need to declare it explicitly for custom mappers that supply other reactive inputs, or to opt out with `renderReadyWhen: []` if your component doesn't need `field`.
+> **Convention:** When using built-in mappers (`valueFieldMapper`, `checkboxFieldMapper`, `optionsFieldMapper`, etc.), `renderReadyWhen: ['field']` is applied automatically if your component needs the `field` input. You only need to declare it explicitly for custom mappers that supply other reactive inputs, or to opt out with `renderReadyWhen: []` if your component doesn't need `field`.
 
 ### 4. Create Provider Function
 
@@ -291,9 +291,41 @@ export const CustomCheckboxType: FieldTypeDefinition = {
 };
 ```
 
+### optionsFieldMapper
+
+For select/radio/multi-checkbox fields:
+
+```typescript
+import { FieldTypeDefinition } from '@ng-forge/dynamic-forms';
+import { optionsFieldMapper } from '@ng-forge/dynamic-forms/integration';
+
+export const CustomSelectType: FieldTypeDefinition = {
+  name: 'select',
+  loadComponent: () => import('./custom-select.component'),
+  mapper: optionsFieldMapper, // Maps option fields
+  renderReadyWhen: ['field'],
+};
+```
+
+### datepickerFieldMapper
+
+For datepicker fields:
+
+```typescript
+import { FieldTypeDefinition } from '@ng-forge/dynamic-forms';
+import { datepickerFieldMapper } from '@ng-forge/dynamic-forms/integration';
+
+export const CustomDatepickerType: FieldTypeDefinition = {
+  name: 'datepicker',
+  loadComponent: () => import('./custom-datepicker.component'),
+  mapper: datepickerFieldMapper, // Maps datepicker fields
+  renderReadyWhen: ['field'],
+};
+```
+
 ### Writing a Custom Mapper
 
-The built-in `valueFieldMapper` and `checkboxFieldMapper` cover most use cases. You need a custom mapper when your component expects a different set of input bindings than the standard ones — for example, a button that has no `field` input, or a component that reshapes props into a different structure.
+The built-in `valueFieldMapper`, `checkboxFieldMapper`, `optionsFieldMapper` and `datepickerFieldMapper` cover most use cases. You need a custom mapper when your component expects a different set of input bindings than the standard ones — for example, a button that has no `field` input, or a component that reshapes props into a different structure.
 
 A mapper is a function that receives the resolved field definition and returns an array of `Binding` objects. Each binding maps a field property to a component input:
 

@@ -153,6 +153,12 @@ export function mapFieldToForm(fieldDef: FieldDef<unknown>, fieldPath: AnySchema
 
 /**
  * Maps children of a container field (page, row, group) to the form schema.
+ *
+ * Layout containers (page/row/container) flatten into `parentPath` and are
+ * recursed through without consuming a key — same contract as `mapFieldToForm`'s
+ * top-level layout branch, so any depth of layout-container nesting reaches its
+ * leaf descendants. Group/array fields consume their key and look up their own
+ * child path on `parentPath`.
  */
 function mapContainerChildren(fields: readonly FieldDef<unknown>[] | undefined, parentPath: AnySchemaPath): void {
   if (!fields) return;
@@ -160,6 +166,11 @@ function mapContainerChildren(fields: readonly FieldDef<unknown>[] | undefined, 
   const pathRecord = parentPath as Record<string, AnySchemaPath>;
 
   for (const field of fields) {
+    if (isPageField(field) || isRowField(field) || isContainerTypedField(field)) {
+      mapContainerChildren(field.fields as readonly FieldDef<unknown>[] | undefined, parentPath);
+      continue;
+    }
+
     if (!field.key) continue;
 
     const childPath = pathRecord[field.key];
@@ -287,12 +298,21 @@ function mapArrayFieldToForm(arrayField: FieldDef<unknown>, fieldPath: AnySchema
   const allObjectFields: FieldDef<unknown>[] = [];
 
   for (const itemDef of itemDefinitions) {
-    if (!Array.isArray(itemDef)) {
-      // Primitive item: single FieldDef
-      hasPrimitiveItems = true;
-    } else {
+    if (Array.isArray(itemDef)) {
       // Object item: collect fields for superset schema
       collectFieldsFromObjectItem(itemDef as readonly FieldDef<unknown>[], allObjectFields);
+    } else if (
+      isPageField(itemDef as FieldDef<unknown>) ||
+      isRowField(itemDef as FieldDef<unknown>) ||
+      isContainerTypedField(itemDef as FieldDef<unknown>)
+    ) {
+      // Layout container as a single-template item: its descendants describe
+      // the item's object shape. Hand it to the object-item collector wrapped
+      // as a 1-element array so the structured-item mapping path runs.
+      collectFieldsFromObjectItem([itemDef as FieldDef<unknown>], allObjectFields);
+    } else {
+      // Primitive item: single FieldDef
+      hasPrimitiveItems = true;
     }
   }
 

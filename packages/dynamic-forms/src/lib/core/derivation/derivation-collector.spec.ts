@@ -708,6 +708,132 @@ describe('derivation-collector', () => {
         expect(collection.entries[0].dependsOn).toEqual(['items.$.name']);
       });
 
+      it('should resolve $self through layout containers inside arrays (array > container > input)', () => {
+        // Mirror of the `group > container > input` case: layout containers
+        // must pass through arrayPath unchanged, so $self for an input two
+        // hops below an array still resolves to the array placeholder path.
+        // Repros downstream addressList finding where array > itemContainer
+        // > input fields lost their $self → arrayPath.$.fieldKey resolution.
+        const fields = [
+          {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                key: 'addressItemContainer',
+                type: 'container',
+                fields: [
+                  {
+                    key: 'state',
+                    type: 'text',
+                    logic: [
+                      {
+                        type: 'derivation',
+                        functionName: 'uppercase',
+                        dependsOn: ['$self'],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ] as unknown as FieldDef<unknown>[];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('addresses.$.state');
+        expect(collection.entries[0].dependsOn).toEqual(['addresses.$.state']);
+      });
+
+      it('should resolve $self through nested layout containers inside arrays (array > container > container > input)', () => {
+        // Reproduces the downstream dbxForgeAddressListField nesting:
+        // array > itemContainer > container(flex) > input(state).
+        // $self must resolve to the array placeholder path even when two
+        // layout containers sit between the array and the input.
+        const fields = [
+          {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                key: 'addressItemContainer',
+                type: 'container',
+                fields: [
+                  {
+                    key: 'flexContainer',
+                    type: 'container',
+                    fields: [
+                      {
+                        key: 'state',
+                        type: 'text',
+                        logic: [
+                          {
+                            type: 'derivation',
+                            functionName: 'uppercase',
+                            dependsOn: ['$self'],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ] as unknown as FieldDef<unknown>[];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('addresses.$.state');
+        expect(collection.entries[0].dependsOn).toEqual(['addresses.$.state']);
+      });
+
+      it('should resolve $self through layout containers and an inner group inside arrays (array > container > group > input)', () => {
+        // Containers between the array and an inner group should not break
+        // the array.$.group.field path — the group key is appended to the
+        // array placeholder path, layout containers contribute nothing.
+        const fields = [
+          {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                key: 'addressItemContainer',
+                type: 'container',
+                fields: [
+                  {
+                    key: 'address',
+                    type: 'group',
+                    fields: [
+                      {
+                        key: 'state',
+                        type: 'text',
+                        logic: [
+                          {
+                            type: 'derivation',
+                            functionName: 'uppercase',
+                            dependsOn: ['$self'],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ] as unknown as FieldDef<unknown>[];
+
+        const collection = collectDerivations(fields);
+
+        expect(collection.entries.length).toBe(1);
+        expect(collection.entries[0].fieldKey).toBe('addresses.$.address.state');
+        expect(collection.entries[0].dependsOn).toEqual(['addresses.$.address.state']);
+      });
+
       it('should resolve $self to the deeply nested absolute path (group > group > input)', () => {
         const fields: FieldDef<unknown>[] = [
           {

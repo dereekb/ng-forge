@@ -3473,4 +3473,78 @@ describe('DynamicFormComponent', () => {
       await expect(clearPromise).resolves.toBeDefined();
     });
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Property derivation reactivity — sync resolution race
+  //
+  // Reproduces the navigate-back bug: when COMPONENT_CACHE (providedIn: 'root')
+  // is warm from a previous DynamicForm instance, FormStateManager takes the
+  // resolveFieldSync path, which calls mapFieldToInputs synchronously during
+  // bootstrap — before PropertyDerivationOrchestrator's explicitEffect has had
+  // a chance to register fields in PROPERTY_OVERRIDE_STORE. Before the fix the
+  // mapper consulted the store non-reactively at call time, took the fast path,
+  // and returned a static signal that never reflected overrides written later.
+  // ───────────────────────────────────────────────────────────────────────────
+  describe('Property derivation reactivity (sync resolution race)', () => {
+    it('should reflect property override on a re-created form once components are cached', async () => {
+      const configWithDerivation: TestFormConfig = {
+        fields: [
+          {
+            key: 'src',
+            type: 'input',
+            label: 'Source',
+          },
+          {
+            key: 'dest',
+            type: 'input',
+            label: 'STATIC_LABEL',
+            // type: 'derivation' with targetProperty routes to property-override store.
+            // Override 'label' from formValue.src whenever src changes.
+            logic: [
+              {
+                type: 'derivation',
+                targetProperty: 'label',
+                expression: 'formValue.src',
+                dependsOn: ['src'],
+                trigger: 'onChange',
+              },
+            ],
+          } as any,
+        ],
+      };
+
+      // First mount: cold COMPONENT_CACHE → async resolveField path. By the time
+      // mapFieldToInputs runs, the orchestrator's effect has already registered
+      // 'dest', so the mapper wraps in computed and the override applies.
+      const first = createComponent(configWithDerivation, { src: 'FROM_FIRST', dest: '' });
+      await waitForDynamicComponents(first.fixture);
+
+      const firstHarnesses = first.fixture.debugElement.queryAll(
+        (by: DebugElement) => by.componentInstance instanceof TestInputHarnessComponent,
+      );
+      const firstDest = firstHarnesses.find((h) => h.componentInstance.key() === 'dest');
+      expect(firstDest, 'dest harness should render on first mount').toBeDefined();
+      expect(firstDest!.componentInstance.label()).toBe('FROM_FIRST');
+
+      // Tear down — mimics navigation away from the form route.
+      first.fixture.destroy();
+
+      // Second mount: COMPONENT_CACHE is warm (root-scoped, survives component
+      // destruction), so FormStateManager takes resolveFieldSync. Mapper runs in
+      // the same task as the orchestrator's construction, before its effect has
+      // fired. The fix decouples the mapper's hasOverrides check from store
+      // registration timing by inspecting the FieldDef directly.
+      const second = createComponent(configWithDerivation, { src: 'FROM_SECOND', dest: '' });
+      await waitForDynamicComponents(second.fixture);
+
+      const secondHarnesses = second.fixture.debugElement.queryAll(
+        (by: DebugElement) => by.componentInstance instanceof TestInputHarnessComponent,
+      );
+      const secondDest = secondHarnesses.find((h) => h.componentInstance.key() === 'dest');
+      expect(secondDest, 'dest harness should render on second mount').toBeDefined();
+
+      // Override should propagate to the harness on the second mount too.
+      expect(secondDest!.componentInstance.label()).toBe('FROM_SECOND');
+    });
+  });
 });

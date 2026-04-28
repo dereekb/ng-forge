@@ -5,6 +5,7 @@ import { hasChildFields } from '../../models/types/type-guards';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import type { WarningTracker } from '../../utils/warning-tracker';
 import { normalizeFieldsArray } from '../../utils/object-utils';
+import { getNormalizedArrayMetadata } from '../../utils/array-field/normalized-array-metadata';
 import { extractExpressionDependencies, extractStringDependencies } from '../cross-field/cross-field-detector';
 import { buildPropertyOverrideKey, PLACEHOLDER_INDEX } from './property-override-key';
 import { PropertyDerivationCollection, PropertyDerivationEntry } from './property-derivation-types';
@@ -64,7 +65,22 @@ function traverseFields(fields: FieldDef<unknown>[], entries: PropertyDerivation
       if (field.type === 'array') {
         childContext.arrayPath = field.key;
 
-        const arrayItems = normalizeFieldsArray(field.fields) as (FieldDef<unknown> | FieldDef<unknown>[])[];
+        let arrayItems = normalizeFieldsArray(field.fields) as (FieldDef<unknown> | FieldDef<unknown>[])[];
+
+        // Simplified arrays initialized without `value` have empty `fields`;
+        // their item shape only lives in Symbol metadata. Fall back to that
+        // template so property derivations inside it are still collected.
+        if (arrayItems.length === 0) {
+          const metadataTemplate = getNormalizedArrayMetadata(field)?.template;
+          if (metadataTemplate) {
+            arrayItems = [
+              Array.isArray(metadataTemplate)
+                ? [...(metadataTemplate as readonly FieldDef<unknown>[])]
+                : (metadataTemplate as FieldDef<unknown>),
+            ];
+          }
+        }
+
         const normalizedChildren: FieldDef<unknown>[] = [];
 
         for (const item of arrayItems) {

@@ -23,6 +23,7 @@ import { isArrayField } from '../definitions/default/array-field';
 import { isPageField } from '../definitions/default/page-field';
 import { isRowField } from '../definitions/default/row-field';
 import { isContainerTypedField } from '../definitions/default/container-field';
+import { getNormalizedArrayMetadata } from '../utils/array-field/normalized-array-metadata';
 import { DynamicFormError } from '../errors/dynamic-form-error';
 
 // Type alias for schema path parameters
@@ -281,10 +282,23 @@ function mapArrayFieldToForm(arrayField: FieldDef<unknown>, fieldPath: AnySchema
   }
 
   // Fields can be either FieldDef (primitive) or FieldDef[] (object)
-  const itemDefinitions = arrayField.fields as readonly (FieldDef<unknown> | readonly FieldDef<unknown>[])[];
+  let itemDefinitions = arrayField.fields as readonly (FieldDef<unknown> | readonly FieldDef<unknown>[])[];
 
-  // Empty array is valid - items will be added via buttons with their own templates
-  // Create a minimal schema that just accepts any value
+  // Simplified arrays initialized without `value` have empty `fields`; their
+  // item shape only lives in Symbol metadata. Fall back to that template so
+  // validators and logic declared inside it still apply when items are
+  // materialized from a programmatically-set form value.
+  if (!itemDefinitions || itemDefinitions.length === 0) {
+    const metadataTemplate = getNormalizedArrayMetadata(arrayField)?.template;
+    if (metadataTemplate) {
+      itemDefinitions = [
+        Array.isArray(metadataTemplate) ? [...(metadataTemplate as readonly FieldDef<unknown>[])] : (metadataTemplate as FieldDef<unknown>),
+      ];
+    }
+  }
+
+  // Empty array with no template metadata - items will be added via buttons with
+  // their own templates. Create a minimal schema that just accepts any value.
   if (!itemDefinitions || itemDefinitions.length === 0) {
     const emptyItemSchema = schema<unknown>(() => {
       // No fields to map - items will be added dynamically via buttons

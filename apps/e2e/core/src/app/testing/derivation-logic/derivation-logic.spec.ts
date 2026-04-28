@@ -745,6 +745,155 @@ test.describe('Value Derivation Logic Tests', () => {
     });
   });
 
+  test.describe('Array → Container → Field $self Derivation (Post-Init Value)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(testUrl('/test/derivation-logic/array-container-field-self-derivation'));
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('should fire $self-resolved derivation when array value is set programmatically AFTER form init', async ({ page, helpers }) => {
+      const scenario = helpers.getScenario('array-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      // The array's inline fields template renders one empty item by default.
+      const firstInputs = scenario.locator('[id^="first"] input');
+      await expect(firstInputs).toHaveCount(1);
+      await expect(firstInputs.nth(0)).toHaveValue('');
+
+      // Click the button that programmatically sets formValue to { array: [{ first: 'hi' }] }
+      // AFTER the form has been initialized.
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      // The $self derivation should have fired and uppercased 'hi' → 'HI'
+      // even though the leaf is buried under a container in the array item.
+      await expect(firstInputs.nth(0)).toHaveValue('HI');
+    });
+
+    test('should fire $self derivation when user edits the container-wrapped array item field after post-init load', async ({
+      page,
+      helpers,
+    }) => {
+      const scenario = helpers.getScenario('array-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      const firstInput = scenario.locator('[id^="first"] input').nth(0);
+      await expect(firstInput).toHaveValue('HI');
+
+      await helpers.clearAndFill(firstInput, 'hello');
+      await page.waitForTimeout(500);
+      await expect(firstInput).toHaveValue('HELLO');
+    });
+
+    test('should fire $self derivation when array value is REPLACED after the form already has a value', async ({ page, helpers }) => {
+      const scenario = helpers.getScenario('array-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      // First load
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      const firstInput = scenario.locator('[id^="first"] input').nth(0);
+      await expect(firstInput).toHaveValue('HI');
+
+      // Replace with a new value programmatically — derivation should re-fire on the new value
+      await page.locator('[data-testid="update-value"]').click();
+      await page.waitForTimeout(500);
+
+      await expect(firstInput).toHaveValue('WORLD');
+    });
+
+    test('should fire $self derivation on a newly added container-wrapped array item after post-init load', async ({ page, helpers }) => {
+      const scenario = helpers.getScenario('array-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      const firstInputs = scenario.locator('[id^="first"] input');
+      const addButton = scenario.locator('#addItem button');
+
+      await expect(firstInputs).toHaveCount(1);
+
+      await addButton.click();
+      await page.waitForTimeout(500);
+      await expect(firstInputs).toHaveCount(2);
+
+      const newInput = firstInputs.nth(1);
+      await helpers.clearAndFill(newInput, 'fresh');
+      await page.waitForTimeout(500);
+      await expect(newInput).toHaveValue('FRESH');
+    });
+  });
+
+  test.describe('Array → Container → Container → Field $self Derivation (Post-Init Value)', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto(testUrl('/test/derivation-logic/array-double-container-field-self-derivation'));
+      await page.waitForLoadState('networkidle');
+    });
+
+    test('should fire $self-resolved derivation when array value is set programmatically AFTER form init (double container, template-only array)', async ({
+      page,
+      helpers,
+    }) => {
+      const scenario = helpers.getScenario('array-double-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      // Array uses `template` only — no inline items render before a value is set.
+      const firstInputs = scenario.locator('[id^="first"] input');
+      await expect(firstInputs).toHaveCount(0);
+
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      await expect(firstInputs).toHaveCount(1);
+
+      // The $self derivation should fire and uppercase 'hi' → 'HI' even when
+      // the leaf is buried under TWO nested containers in the array item.
+      await expect(firstInputs.nth(0)).toHaveValue('HI');
+    });
+
+    test('should fire $self derivation when user edits the doubly-container-wrapped array item field after post-init load', async ({
+      page,
+      helpers,
+    }) => {
+      const scenario = helpers.getScenario('array-double-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      const firstInput = scenario.locator('[id^="first"] input').nth(0);
+      await expect(firstInput).toHaveValue('HI');
+
+      await helpers.clearAndFill(firstInput, 'hello');
+      await page.waitForTimeout(500);
+      await expect(firstInput).toHaveValue('HELLO');
+    });
+
+    test('should fire $self derivation when array value is REPLACED after the form already has a value (double container)', async ({
+      page,
+      helpers,
+    }) => {
+      const scenario = helpers.getScenario('array-double-container-field-self-derivation-test');
+      await expect(scenario).toBeVisible();
+
+      await page.locator('[data-testid="load-value"]').click();
+      await page.waitForTimeout(500);
+
+      const firstInput = scenario.locator('[id^="first"] input').nth(0);
+      await expect(firstInput).toHaveValue('HI');
+
+      await page.locator('[data-testid="update-value"]').click();
+      await page.waitForTimeout(500);
+
+      await expect(firstInput).toHaveValue('WORLD');
+    });
+  });
+
   test.describe('Derivation in Group', () => {
     test.skip(true, 'Library limitation: derivation expressions inside group containers do not evaluate correctly');
     test('should derive fullName from firstName and lastName inside a group', async ({ page, helpers }) => {

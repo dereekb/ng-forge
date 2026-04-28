@@ -4,6 +4,7 @@ import { DynamicFormError } from '../../errors/dynamic-form-error';
 import { DerivationLogicConfig, hasTargetProperty, isDerivationLogicConfig } from '../../models/logic/logic-config';
 import { hasChildFields } from '../../models/types/type-guards';
 import { normalizeFieldsArray } from '../../utils/object-utils';
+import { getNormalizedArrayMetadata } from '../../utils/array-field/normalized-array-metadata';
 import { extractExpressionDependencies, extractStringDependencies } from '../cross-field/cross-field-detector';
 import { topologicalSort } from './derivation-sorter';
 import { DerivationCollection, DerivationEntry } from './derivation-types';
@@ -134,7 +135,24 @@ function traverseFields(fields: FieldDef<unknown>[], entries: DerivationEntry[],
 
         // Array fields have items that can be either FieldDef (primitive) or FieldDef[] (object).
         // Normalize all items to arrays and flatten for traversal.
-        const arrayItems = normalizeFieldsArray(field.fields) as (FieldDef<unknown> | FieldDef<unknown>[])[];
+        let arrayItems = normalizeFieldsArray(field.fields) as (FieldDef<unknown> | FieldDef<unknown>[])[];
+
+        // Simplified arrays expose their item shape only via Symbol metadata
+        // when initialized without a starting `value` — `fields` is empty in
+        // that case. Fall back to the metadata template so derivations declared
+        // inside it are still collected; the resulting placeholder entry path
+        // ('array.$.x') applies to every item materialized at runtime.
+        if (arrayItems.length === 0) {
+          const metadataTemplate = getNormalizedArrayMetadata(field)?.template;
+          if (metadataTemplate) {
+            arrayItems = [
+              Array.isArray(metadataTemplate)
+                ? [...(metadataTemplate as readonly FieldDef<unknown>[])]
+                : (metadataTemplate as FieldDef<unknown>),
+            ];
+          }
+        }
+
         const normalizedChildren: FieldDef<unknown>[] = [];
 
         for (const item of arrayItems) {

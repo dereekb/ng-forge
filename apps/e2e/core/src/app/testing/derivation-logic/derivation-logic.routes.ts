@@ -48,6 +48,23 @@ const routes: Routes = [
     data: { scenario: getDerivationLogicScenario('array-field-derivation-test') },
   },
   {
+    path: 'array-field-self-derivation',
+    loadComponent: () => import('../shared/test-scenario.component').then((m) => m.TestScenarioComponent),
+    data: { scenario: getDerivationLogicScenario('array-field-self-derivation-test') },
+  },
+  {
+    path: 'array-container-field-self-derivation',
+    loadComponent: () =>
+      import('./scenarios/array-container-field-self-derivation.component').then((m) => m.ArrayContainerFieldSelfDerivationComponent),
+  },
+  {
+    path: 'array-double-container-field-self-derivation',
+    loadComponent: () =>
+      import('./scenarios/array-double-container-field-self-derivation.component').then(
+        (m) => m.ArrayDoubleContainerFieldSelfDerivationComponent,
+      ),
+  },
+  {
     path: 'bidirectional-float',
     loadComponent: () => import('../shared/test-scenario.component').then((m) => m.TestScenarioComponent),
     data: { scenario: getDerivationLogicScenario('bidirectional-float-test') },

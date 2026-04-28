@@ -826,6 +826,182 @@ describe('form-mapping', () => {
       });
     });
 
+    describe('array item layout containers', () => {
+      // Locks in the downstream dbxForgeAddressListField fix: a value-bearing
+      // input nested under one or more layout containers (page/row/container)
+      // inside an array item must still receive its schema mapping. Without
+      // this, validators/logic/derivations against the leaf path do nothing.
+      // `mapContainerChildren` flattens layout containers into the parent
+      // path, so any depth of layout-container nesting reaches the leaf.
+      it('should apply required validator to an input nested under a container inside an array item', () => {
+        runInInjectionContext(injector, () => {
+          const formValue = signal({ addresses: [{ state: '' }] });
+          const arrayField = {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                type: 'container',
+                fields: [{ key: 'state', type: 'input', required: true }],
+                wrappers: [],
+              },
+            ],
+          } as unknown as FieldDef;
+
+          const formInstance = form(
+            formValue,
+            schema<typeof formValue>((path) => {
+              mapFieldToForm(arrayField, path.addresses as any);
+            }),
+          );
+          mockFormSignal.set(formInstance);
+
+          expect(formInstance().valid()).toBe(false);
+        });
+      });
+
+      it('should apply required validator to an input nested under TWO containers inside an array item', () => {
+        // Mirrors the deepest downstream nesting: array > itemContainer >
+        // container(flex) > input(state).
+        runInInjectionContext(injector, () => {
+          const formValue = signal({ addresses: [{ state: '' }] });
+          const arrayField = {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                type: 'container',
+                fields: [
+                  {
+                    type: 'container',
+                    fields: [{ key: 'state', type: 'input', required: true }],
+                    wrappers: [],
+                  },
+                ],
+                wrappers: [],
+              },
+            ],
+          } as unknown as FieldDef;
+
+          const formInstance = form(
+            formValue,
+            schema<typeof formValue>((path) => {
+              mapFieldToForm(arrayField, path.addresses as any);
+            }),
+          );
+          mockFormSignal.set(formInstance);
+
+          expect(formInstance().valid()).toBe(false);
+        });
+      });
+
+      it('should apply required validator to a leaf inside a group nested under a container in an array item', () => {
+        // array > container > group > input — the inner group still consumes
+        // its key (address), the layout container flattens into the item path.
+        runInInjectionContext(injector, () => {
+          const formValue = signal({ addresses: [{ address: { state: '' } }] });
+          const arrayField = {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                type: 'container',
+                fields: [
+                  {
+                    key: 'address',
+                    type: 'group',
+                    fields: [{ key: 'state', type: 'input', required: true }],
+                  },
+                ],
+                wrappers: [],
+              },
+            ],
+          } as unknown as FieldDef;
+
+          const formInstance = form(
+            formValue,
+            schema<typeof formValue>((path) => {
+              mapFieldToForm(arrayField, path.addresses as any);
+            }),
+          );
+          mockFormSignal.set(formInstance);
+
+          expect(formInstance().valid()).toBe(false);
+        });
+      });
+
+      it('should apply required validator to an input nested under all three layout container types in an array item', () => {
+        // array > row > page > container > input — exercises every layout
+        // container type in one chain.
+        runInInjectionContext(injector, () => {
+          const formValue = signal({ addresses: [{ state: '' }] });
+          const arrayField = {
+            key: 'addresses',
+            type: 'array',
+            fields: [
+              {
+                type: 'row',
+                fields: [
+                  {
+                    type: 'page',
+                    fields: [
+                      {
+                        type: 'container',
+                        wrappers: [],
+                        fields: [{ key: 'state', type: 'input', required: true }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          } as unknown as FieldDef;
+
+          const formInstance = form(
+            formValue,
+            schema<typeof formValue>((path) => {
+              mapFieldToForm(arrayField, path.addresses as any);
+            }),
+          );
+          mockFormSignal.set(formInstance);
+
+          expect(formInstance().valid()).toBe(false);
+        });
+      });
+    });
+
+    describe('group with layout container child', () => {
+      // The same fix in `mapContainerChildren` also repairs the group case:
+      // an input nested under a layout container inside a group at form root
+      // was previously skipped for the same reason as the array case.
+      it('should apply required validator to an input nested under a container inside a group at form root', () => {
+        runInInjectionContext(injector, () => {
+          const formValue = signal({ address: { state: '' } });
+          const groupField = {
+            key: 'address',
+            type: 'group',
+            fields: [
+              {
+                type: 'container',
+                fields: [{ key: 'state', type: 'input', required: true }],
+                wrappers: [],
+              },
+            ],
+          } as unknown as FieldDef;
+
+          const formInstance = form(
+            formValue,
+            schema<typeof formValue>((path) => {
+              mapFieldToForm(groupField, path.address as any);
+            }),
+          );
+          mockFormSignal.set(formInstance);
+
+          expect(formInstance().valid()).toBe(false);
+        });
+      });
+    });
+
     describe('nullable + required interaction', () => {
       // Documents that `nullable` and `required` describe different layers: nullable
       // widens the accepted value shape; required validates that a value is present.

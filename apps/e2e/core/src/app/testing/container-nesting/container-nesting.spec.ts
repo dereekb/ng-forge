@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test';
 import { expect, setupConsoleCheck, setupTestLogging, test } from '../shared/fixtures';
+import { fillInput } from '../shared/test-utils';
 
 setupTestLogging();
 setupConsoleCheck();
@@ -149,6 +150,68 @@ test.describe('Container Nesting E2E Tests', () => {
       expect(data['firstName']).toBe('Ada');
       expect(data['nickname']).toBe('Lovelace');
       expect(data['pronouns']).toBe('she/her');
+    });
+  });
+
+  test.describe('Container Inside Group', () => {
+    test('should fire derivation for an input nested as group > container > input', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/container-inside-group');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('container-inside-group');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const stateInput = scenario.locator('#state input');
+      await expect(stateInput).toBeVisible({ timeout: 5000 });
+      await fillInput(stateInput, 'tx');
+
+      // Derivation should self-transform the value to uppercase.
+      await expect(stateInput).toHaveValue('TX', { timeout: 5000 });
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      // Container is layout-only — `state` lives under the `address` group boundary.
+      const address = data['address'] as Record<string, unknown>;
+      expect(address['state']).toBe('TX');
+    });
+
+    test('should resolve $self in dependsOn for an input nested as group > container > input', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/container-inside-group-self');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('container-inside-group-self');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const stateInput = scenario.locator('#state input');
+      await expect(stateInput).toBeVisible({ timeout: 5000 });
+      await fillInput(stateInput, 'tx');
+
+      // $self resolves to `address.state` so the derivation fires and writes back.
+      await expect(stateInput).toHaveValue('TX', { timeout: 5000 });
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      const address = data['address'] as Record<string, unknown>;
+      expect(address['state']).toBe('TX');
+    });
+
+    test('should fire derivation when any sibling in the parent group changes via $group', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/container-inside-group-parent');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('container-inside-group-parent');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      const countryInput = scenario.locator('#country input');
+      const stateInput = scenario.locator('#state input');
+      await expect(countryInput).toBeVisible({ timeout: 5000 });
+
+      // $group resolves to 'address' — fires the derivation on any sibling change.
+      await fillInput(countryInput, 'usa');
+      await expect(stateInput).toHaveValue('NY', { timeout: 5000 });
+
+      await fillInput(countryInput, 'canada');
+      await expect(stateInput).toHaveValue('ON', { timeout: 5000 });
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      const address = data['address'] as Record<string, unknown>;
+      expect(address['country']).toBe('canada');
+      expect(address['state']).toBe('ON');
     });
   });
 

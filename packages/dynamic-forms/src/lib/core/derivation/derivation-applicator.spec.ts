@@ -807,6 +807,65 @@ describe('derivation-applicator', () => {
       expect(values.items[0].lineTotal).toBe(20); // 2 * 10
       expect(itemDirtyStates[0]['lineTotal']()).toBe(false);
     });
+
+    // Regression coverage for the array-item evaluation context: $self / fieldValue
+    // derivations must receive the leaf value at the entry's relative path inside
+    // the array item, not the entire item object. Previously fieldValue was set
+    // to `arrayItem`, so a function reading ctx.fieldValue saw `{quantity, unitPrice, lineTotal}`
+    // instead of the field's own value.
+    it('should pass the leaf field value (not the array item) as ctx.fieldValue inside array items', () => {
+      const { form, values } = createMockArrayForm({
+        items: [
+          { quantity: 2, unitPrice: 10, lineTotal: 7 },
+          { quantity: 3, unitPrice: 20, lineTotal: 13 },
+        ],
+        globalDiscount: 0,
+      });
+
+      const formValueSignal = signal({
+        items: values.items,
+        globalDiscount: 0,
+      });
+
+      const captured: Array<{ fieldValue: unknown; fieldPath: unknown; arrayIndex: unknown }> = [];
+
+      const collection = createCollection([
+        createEntry('items.$.lineTotal', {
+          functionName: 'captureLeafValue',
+          dependsOn: ['$self'],
+        }),
+      ]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+        derivationFunctions: {
+          captureLeafValue: (ctx) => {
+            const c = ctx as unknown as Record<string, unknown>;
+            captured.push({
+              fieldValue: c['fieldValue'],
+              fieldPath: c['fieldPath'],
+              arrayIndex: c['arrayIndex'],
+            });
+            // Return value already present so we don't actually mutate
+            return c['fieldValue'];
+          },
+        },
+      };
+
+      applyDerivations(collection, context);
+
+      // One invocation per item, each receiving the leaf lineTotal value (not the item object)
+      expect(captured.length).toBe(2);
+      expect(captured[0].fieldValue).toBe(7);
+      expect(captured[0].fieldPath).toBe('items.0.lineTotal');
+      expect(captured[0].arrayIndex).toBe(0);
+      expect(captured[1].fieldValue).toBe(13);
+      expect(captured[1].fieldPath).toBe('items.1.lineTotal');
+      expect(captured[1].arrayIndex).toBe(1);
+    });
   });
 
   describe('external data in derivations', () => {
@@ -1668,6 +1727,94 @@ describe('derivation-applicator', () => {
       applyDerivations(createCollection([entry]), context);
 
       expect(values.middleName).toBe(null);
+    });
+  });
+
+  describe('groupValue in evaluation context', () => {
+    let logger: Logger;
+    let formValueSignal: WritableSignal<Record<string, unknown>>;
+
+    beforeEach(() => {
+      logger = createMockLogger();
+      formValueSignal = signal({});
+    });
+
+    it('should populate groupValue with the parent group object for fields nested in a group', () => {
+      const { form } = createMockForm({ note: '' });
+      formValueSignal.set({ address: { country: 'usa', state: '' } });
+
+      let captured: unknown;
+      const captureFn = vi.fn().mockImplementation((ctx: { groupValue?: unknown }) => {
+        captured = ctx.groupValue;
+        return ctx.groupValue ? 'CAPTURED' : '';
+      });
+
+      const collection = createCollection([createEntry('address.state', { functionName: 'capture', dependsOn: ['*'] })]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        derivationFunctions: { capture: captureFn },
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+      };
+
+      applyDerivations(collection, context);
+
+      expect(captureFn).toHaveBeenCalled();
+      expect(captured).toEqual({ country: 'usa', state: '' });
+    });
+
+    it('should populate groupValue with the innermost parent group for nested groups', () => {
+      const { form } = createMockForm({ note: '' });
+      formValueSignal.set({ org: { address: { country: 'usa', state: '' } } });
+
+      let captured: unknown;
+      const captureFn = vi.fn().mockImplementation((ctx: { groupValue?: unknown }) => {
+        captured = ctx.groupValue;
+        return '';
+      });
+
+      const collection = createCollection([createEntry('org.address.state', { functionName: 'capture', dependsOn: ['*'] })]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        derivationFunctions: { capture: captureFn },
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+      };
+
+      applyDerivations(collection, context);
+
+      // Innermost parent is `address`, not `org`.
+      expect(captured).toEqual({ country: 'usa', state: '' });
+    });
+
+    it('should leave groupValue as undefined for fields at form root', () => {
+      const { form } = createMockForm({ rootField: '' });
+      formValueSignal.set({ rootField: 'foo' });
+
+      let captured: unknown = 'sentinel';
+      const captureFn = vi.fn().mockImplementation((ctx: { groupValue?: unknown }) => {
+        captured = ctx.groupValue;
+        return '';
+      });
+
+      const collection = createCollection([createEntry('rootField', { functionName: 'capture', dependsOn: ['*'] })]);
+
+      const context: DerivationApplicatorContext = {
+        formValue: formValueSignal,
+        rootForm: form as unknown as import('@angular/forms/signals').FieldTree<unknown>,
+        derivationFunctions: { capture: captureFn },
+        logger,
+        derivationLogger: createMockDerivationLogger(),
+      };
+
+      applyDerivations(collection, context);
+
+      expect(captureFn).toHaveBeenCalled();
+      expect(captured).toBeUndefined();
     });
   });
 });

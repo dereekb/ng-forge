@@ -7,6 +7,9 @@ import { selfTransformScenario } from './scenarios/self-transform.scenario';
 import { chainDerivationScenario } from './scenarios/chain-derivation.scenario';
 import { shorthandDerivationScenario } from './scenarios/shorthand-derivation.scenario';
 import { arrayFieldDerivationScenario } from './scenarios/array-field-derivation.scenario';
+import { arrayFieldSelfDerivationScenario } from './scenarios/array-field-self-derivation.scenario';
+import { arrayContainerFieldSelfDerivationScenario } from './scenarios/array-container-field-self-derivation.scenario';
+import { arrayDoubleContainerFieldSelfDerivationScenario } from './scenarios/array-double-container-field-self-derivation.scenario';
 import { bidirectionalFloatScenario } from './scenarios/bidirectional-float.scenario';
 import { derivationInGroupScenario } from './scenarios/derivation-in-group.scenario';
 import { stopOnUserOverrideScenario } from './scenarios/stop-on-user-override.scenario';
@@ -39,6 +42,9 @@ export const derivationLogicSuite: TestSuite = {
     chainDerivationScenario,
     shorthandDerivationScenario,
     arrayFieldDerivationScenario,
+    arrayFieldSelfDerivationScenario,
+    arrayContainerFieldSelfDerivationScenario,
+    arrayDoubleContainerFieldSelfDerivationScenario,
     bidirectionalFloatScenario,
     derivationInGroupScenario,
     stopOnUserOverrideScenario,

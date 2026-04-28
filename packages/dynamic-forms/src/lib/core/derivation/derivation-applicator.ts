@@ -8,7 +8,6 @@ import { isEqual } from '../../utils/object-utils';
 import { parseArrayPath, resolveArrayPath, isArrayPlaceholderPath } from '../../utils/path-utils/path-utils';
 import { CustomFunction } from '../expressions/custom-function-types';
 import { evaluateCondition } from '../expressions/condition-evaluator';
-import { ExpressionParser } from '../expressions/parser/expression-parser';
 import { getNestedValue } from '../expressions/value-utils';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import {
@@ -20,6 +19,7 @@ import {
   DerivationProcessingResult,
 } from './derivation-types';
 import type { WarningTracker } from '../../utils/warning-tracker';
+import { computeValueFromEntry } from './compute-derived-value';
 import { MAX_DERIVATION_ITERATIONS } from './derivation-constants';
 import { DerivationLogger } from './derivation-logger.service';
 import { readFieldStateInfo, createFormFieldStateMap } from './field-state-extractor';
@@ -504,16 +504,41 @@ function createEvaluationContext(
   const fieldAccessor = (context.rootForm as FieldTreeRecord)[entry.fieldKey];
   const fieldState = fieldAccessor ? readFieldStateInfo(fieldAccessor, false) : undefined;
 
+  // Parent group value: the absolute path with the trailing field segment
+  // dropped. `undefined` when the field is at form root.
+  const parentPath = getParentPathInScope(entry.fieldKey);
+  const groupValue = parentPath ? getNestedValue(formValue, parentPath) : undefined;
+
   return {
     fieldValue,
     formValue,
     fieldPath: entry.fieldKey,
+    groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,
     logger: context.logger,
     fieldState,
     formFieldState: chainContext.formFieldState,
   };
+}
+
+/**
+ * Returns the path to the parent of the given field path, expressed in the
+ * scope appropriate for the entry. Drops the last `.`-delimited segment.
+ * Returns `undefined` when the field has no parent in scope (e.g., a
+ * single-segment root key, or `'items.$.x'` inside the array-item scope
+ * where `x` is a direct child of the item).
+ *
+ * For non-array entries: `'address.state'` → `'address'`, `'state'` → undefined.
+ * For array entries inside `createEvaluationContext` (root scope): unused —
+ * `createArrayItemEvaluationContext` handles the array-scope case.
+ *
+ * @internal
+ */
+function getParentPathInScope(fieldKey: string): string | undefined {
+  const lastDot = fieldKey.lastIndexOf('.');
+  if (lastDot <= 0) return undefined;
+  return fieldKey.slice(0, lastDot);
 }
 
 /**
@@ -558,10 +583,24 @@ function createArrayItemEvaluationContext(
     }
   }
 
+  // groupValue inside an array item:
+  // - Field directly under the array item (no inner group): the array item
+  //   itself is the "nearest parent group".
+  // - Field inside an inner group within the item: the inner group's value.
+  // The relative path within the item is everything after `'.$.'`.
+  const relativePath = pathInfo.isArrayPath ? (pathInfo.relativePath ?? '') : '';
+  const innerParentPath = relativePath.includes('.') ? relativePath.slice(0, relativePath.lastIndexOf('.')) : '';
+  const groupValue = innerParentPath ? getNestedValue(arrayItem, innerParentPath) : arrayItem;
+  // Resolve fieldValue to the leaf value addressed by the entry's relative path
+  // within the array item. Without this, $self / fieldValue derivations inside
+  // arrays receive the whole array item instead of the field's own value.
+  const fieldValue = relativePath ? getNestedValue(arrayItem, relativePath) : arrayItem;
+
   return {
-    fieldValue: arrayItem,
+    fieldValue,
     formValue: arrayItem,
-    fieldPath: `${arrayPath}.${itemIndex}`,
+    fieldPath: relativePath ? `${arrayPath}.${itemIndex}.${relativePath}` : `${arrayPath}.${itemIndex}`,
+    groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,
     logger: context.logger,
@@ -597,27 +636,10 @@ function computeDerivedValue(
   evalContext: EvaluationContext,
   applicatorContext: DerivationApplicatorContext,
 ): unknown {
-  // Static value
-  if (entry.value !== undefined) {
-    return entry.value;
-  }
-
-  // Expression
-  if (entry.expression) {
-    return ExpressionParser.evaluate(entry.expression, evalContext);
-  }
-
-  // Custom function
-  if (entry.functionName) {
-    const fn = applicatorContext.derivationFunctions?.[entry.functionName];
-    if (!fn) {
-      throw new Error(`Derivation function '${entry.functionName}' not found in customFnConfig.derivations`);
-    }
-    return fn(evalContext);
-  }
-
-  // No value source specified
-  throw new Error(`Derivation for ${entry.fieldKey} has no value source. ` + `Specify 'value', 'expression', or 'functionName'.`);
+  return computeValueFromEntry(entry, evalContext, {
+    derivationFunctions: applicatorContext.derivationFunctions,
+    subject: entry.fieldKey,
+  });
 }
 
 /**

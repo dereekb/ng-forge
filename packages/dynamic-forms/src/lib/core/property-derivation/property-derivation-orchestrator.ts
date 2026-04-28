@@ -1,4 +1,4 @@
-import { computed, DestroyRef, inject, InjectionToken, Injector, isSignal, Signal, untracked } from '@angular/core';
+import { computed, DestroyRef, inject, InjectionToken, Injector, Signal, untracked } from '@angular/core';
 import { DEV_MODE } from '../../utils/dev-mode';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { explicitEffect } from 'ngxtension/explicit-effect';
@@ -26,6 +26,8 @@ import { DEFAULT_DEBOUNCE_MS } from '../../utils/debounce/debounce';
 import { getChangedKeys } from '../../utils/object-utils';
 import { FunctionRegistryService } from '../registry';
 import { DERIVATION_WARNING_TRACKER } from '../derivation/derivation-warning-tracker';
+import { getDebouncePeriods } from '../derivation/debounce-period-utils';
+import { resolveExternalData } from '../derivation/external-data-resolver';
 import { DEPRECATION_WARNING_TRACKER } from '../../utils/deprecation-warning-tracker';
 import { applyPropertyDerivationsForTrigger } from './property-derivation-applicator';
 import { collectPropertyDerivations } from './property-derivation-collector';
@@ -154,7 +156,7 @@ export class PropertyDerivationOrchestrator {
           const collection = untracked(() => this.propertyDerivationCollection());
           if (!collection) return of(null);
 
-          const debouncePeriods = this.getDebouncePeriods(collection.entries);
+          const debouncePeriods = getDebouncePeriods(collection.entries);
           if (debouncePeriods.length === 0) return of(null);
 
           const periodStreams = debouncePeriods.map((debounceMs) => this.createPeriodStream(debounceMs, collection, changedFields));
@@ -187,7 +189,7 @@ export class PropertyDerivationOrchestrator {
       store: this.config.store,
       derivationFunctions: this.functionRegistry.getDerivationFunctions(),
       customFunctions: this.functionRegistry.getCustomFunctions(),
-      externalData: this.resolveExternalData(),
+      externalData: resolveExternalData(this.config.externalData),
       logger: this.logger,
       warningTracker: this.warningTracker,
     };
@@ -209,48 +211,12 @@ export class PropertyDerivationOrchestrator {
       store: this.config.store,
       derivationFunctions: this.functionRegistry.getDerivationFunctions(),
       customFunctions: this.functionRegistry.getCustomFunctions(),
-      externalData: this.resolveExternalData(),
+      externalData: resolveExternalData(this.config.externalData),
       logger: this.logger,
       warningTracker: this.warningTracker,
     };
 
     applyPropertyDerivationsForTrigger(filteredCollection, 'debounced', applicatorContext, changedFields);
-  }
-
-  private getDebouncePeriods(entries: PropertyDerivationEntry[]): number[] {
-    const periods = new Set<number>();
-    for (const entry of entries) {
-      if (entry.trigger === 'debounced') {
-        periods.add(entry.debounceMs ?? DEFAULT_DEBOUNCE_MS);
-      }
-    }
-    return Array.from(periods);
-  }
-
-  /**
-   * Resolves external data signals to their current values.
-   *
-   * Called on every onChange and debounced application. Each call iterates all
-   * external data entries and resolves signals via untracked(). For forms with
-   * many external data entries, this could be optimized by caching the resolved
-   * record and only invalidating when external data signal values change.
-   * In practice, external data entries are few, so the linear scan is acceptable.
-   */
-  private resolveExternalData(): Record<string, unknown> | undefined {
-    const externalDataRecord = untracked(() => this.config.externalData?.());
-
-    if (!externalDataRecord) return undefined;
-
-    const resolved: Record<string, unknown> = {};
-    for (const [key, signalValue] of Object.entries(externalDataRecord)) {
-      if (isSignal(signalValue)) {
-        resolved[key] = untracked(() => signalValue());
-      } else {
-        resolved[key] = signalValue;
-      }
-    }
-
-    return resolved;
   }
 }
 

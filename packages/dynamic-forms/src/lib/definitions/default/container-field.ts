@@ -84,11 +84,22 @@ export interface ContainerField<
 }
 
 /**
- * Type guard for ContainerField with proper type narrowing
+ * Type guard for ContainerField with proper type narrowing.
+ *
+ * `wrappers` is part of the type but optional in practice — many configs use
+ * containers purely as flex/layout wrappers without any wrapper components.
+ * Match on `type === 'container'` and the `fields` shape only, mirroring
+ * `isPageField` / `isRowField`.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Type guard must accept any field type
 export function isContainerTypedField(field: FieldDef<any>): field is ContainerField {
-  return field.type === 'container' && 'fields' in field && 'wrappers' in field;
+  return (
+    field.type === 'container' &&
+    'wrappers' in field &&
+    'fields' in field &&
+    Array.isArray((field as ContainerField).wrappers) &&
+    Array.isArray((field as ContainerField).fields)
+  );
 }
 
 export type ContainerComponent = FieldComponent<ContainerField<ContainerAllowedChildren[]>>;

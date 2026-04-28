@@ -9,8 +9,20 @@ export type {
 
 export { createEmptyDerivationCollection, createDerivationChainContext, createDerivationKey, parseDerivationKey } from './derivation-types';
 
+// Shared base entry shape (extended by both DerivationEntry and PropertyDerivationEntry)
+export type { BaseDerivationEntry } from './derivation-entry-base';
+
+// Shared collection / applicator helpers — used by both derivation and property-derivation pipelines
+export { traverseFieldsWithContext } from './field-traversal';
+export type { FieldTraversalHooks, FieldVisitor } from './field-traversal';
+export { extractDependenciesFromConfig } from './extract-dependencies';
+export { computeValueFromEntry } from './compute-derived-value';
+export type { ComputeValueOptions } from './compute-derived-value';
+export { getDebouncePeriods, filterEntriesByDebouncePeriod } from './debounce-period-utils';
+export { resolveExternalData } from './external-data-resolver';
+
 // Collector
-export { collectDerivations } from './derivation-collector';
+export { collectDerivations, SELF_DEPENDENCY_TOKEN, GROUP_DEPENDENCY_TOKEN } from './derivation-collector';
 
 // Cycle detection
 export { detectCycles, validateNoCycles } from './cycle-detector';

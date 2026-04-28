@@ -1,11 +1,10 @@
 import { FieldDef } from '../../definitions/base/field-def';
 import { FieldWithValidation } from '../../definitions/base/field-with-validation';
 import { DerivationLogicConfig, isDerivationLogicConfig, hasTargetProperty } from '../../models/logic/logic-config';
-import { hasChildFields } from '../../models/types/type-guards';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import type { WarningTracker } from '../../utils/warning-tracker';
-import { normalizeFieldsArray } from '../../utils/object-utils';
-import { extractExpressionDependencies, extractStringDependencies } from '../cross-field/cross-field-detector';
+import { extractDependenciesFromConfig } from '../derivation/extract-dependencies';
+import { traverseFieldsWithContext } from '../derivation/field-traversal';
 import { buildPropertyOverrideKey, PLACEHOLDER_INDEX } from './property-override-key';
 import { PropertyDerivationCollection, PropertyDerivationEntry } from './property-derivation-types';
 
@@ -43,44 +42,12 @@ export function collectPropertyDerivations(
   const entries: PropertyDerivationEntry[] = [];
   const context: CollectionContext = { logger, tracker };
 
-  traverseFields(fields, entries, context);
+  traverseFieldsWithContext<CollectionContext>(fields, context, (field, ctx) => collectFromField(field, entries, ctx), {
+    onArrayChild: (_, field) => ({ arrayPath: field.key }),
+    // Group and layout containers do not affect property-derivation paths.
+  });
 
   return { entries };
-}
-
-/**
- * Recursively traverses field definitions to collect property derivations.
- *
- * @internal
- */
-function traverseFields(fields: FieldDef<unknown>[], entries: PropertyDerivationEntry[], context: CollectionContext): void {
-  for (const field of fields) {
-    collectFromField(field, entries, context);
-
-    // Recursively process container fields (page, row, group, array)
-    if (hasChildFields(field)) {
-      const childContext = { ...context };
-
-      if (field.type === 'array') {
-        childContext.arrayPath = field.key;
-
-        const arrayItems = normalizeFieldsArray(field.fields) as (FieldDef<unknown> | FieldDef<unknown>[])[];
-        const normalizedChildren: FieldDef<unknown>[] = [];
-
-        for (const item of arrayItems) {
-          if (Array.isArray(item)) {
-            normalizedChildren.push(...item);
-          } else {
-            normalizedChildren.push(item);
-          }
-        }
-
-        traverseFields(normalizedChildren, entries, childContext);
-      } else {
-        traverseFields(normalizeFieldsArray(field.fields) as FieldDef<unknown>[], entries, childContext);
-      }
-    }
-  }
 }
 
 /**
@@ -118,7 +85,7 @@ function createPropertyDerivationEntryFromDerivation(
   context: CollectionContext,
 ): PropertyDerivationEntry {
   const effectiveFieldKey = buildPropertyOverrideKey(context.arrayPath, context.arrayPath ? PLACEHOLDER_INDEX : undefined, fieldKey);
-  const dependsOn = extractDependencies(config);
+  const dependsOn = extractDependenciesFromConfig(config);
   const condition = config.condition ?? true;
   const trigger = config.trigger ?? 'onChange';
   const debounceMs = trigger === 'debounced' ? (config as { debounceMs?: number }).debounceMs : undefined;
@@ -136,34 +103,4 @@ function createPropertyDerivationEntryFromDerivation(
     debugName: config.debugName,
     originalConfig: config,
   };
-}
-
-/**
- * Extracts all field dependencies from a property derivation config.
- *
- * @internal
- */
-function extractDependencies(config: DerivationLogicConfig): string[] {
-  const deps = new Set<string>();
-
-  if (config.dependsOn && config.dependsOn.length > 0) {
-    config.dependsOn.forEach((dep) => deps.add(dep));
-  } else {
-    if (config.expression) {
-      const exprDeps = extractStringDependencies(config.expression);
-      exprDeps.forEach((dep) => deps.add(dep));
-    }
-
-    if (config.functionName) {
-      deps.add('*');
-    }
-  }
-
-  // Always extract from condition
-  if (config.condition && config.condition !== true) {
-    const conditionDeps = extractExpressionDependencies(config.condition);
-    conditionDeps.forEach((dep) => deps.add(dep));
-  }
-
-  return Array.from(deps);
 }

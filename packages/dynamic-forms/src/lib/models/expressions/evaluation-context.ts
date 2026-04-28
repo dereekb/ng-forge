@@ -26,6 +26,36 @@ export interface EvaluationContext<TValue = unknown, TFormValue extends Record<s
   logger: Logger;
 
   /**
+   * Value of the field's nearest parent **group** (or array item, when the
+   * field has no inner group above the array boundary).
+   *
+   * Complements `formValue` and `fieldValue` for derivations on fields nested
+   * inside groups built by factory helpers, where the parent group's key
+   * isn't known at config-authoring time. Mirrors the runtime semantics of
+   * the `'$group'` token used in `dependsOn`.
+   *
+   * Resolution at evaluation time:
+   * - Inside a group at form root: the parent group's value object (e.g.,
+   *   for `address.state`, `groupValue === formValue.address`).
+   * - Inside nested groups: the innermost parent group's value object.
+   * - Directly inside an array item (no inner group): the array item itself
+   *   (same shape as `formValue` in array context).
+   * - Inside a group inside an array item: the inner group's value object
+   *   within the current item.
+   * - Field at form root with no parent container: `undefined`.
+   *
+   * @example
+   * ```typescript
+   * // Field 'state' inside group 'address':
+   * deriveStateFromCountry: (ctx) => {
+   *   const country = ctx.groupValue?.country;  // no need to know parent key
+   *   return country === 'usa' ? 'NY' : '';
+   * }
+   * ```
+   */
+  groupValue?: unknown;
+
+  /**
    * Root form value when inside an array context.
    *
    * This provides access to values outside the current array item.

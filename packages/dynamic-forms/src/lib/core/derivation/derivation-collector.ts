@@ -9,7 +9,18 @@ import { topologicalSort } from './derivation-sorter';
 import { DerivationCollection, DerivationEntry } from './derivation-types';
 
 /**
- * Context for collecting derivations, tracking the current array path for relative references.
+ * Token in `dependsOn` arrays that resolves to the current field's own
+ * absolute path at collection time. Useful for self-derivations on fields
+ * nested under groups, where the absolute path depends on ancestor keys
+ * the config author may not know (e.g. factory-built field shapes).
+ *
+ * @public
+ */
+export const SELF_DEPENDENCY_TOKEN = '$self';
+
+/**
+ * Context for collecting derivations, tracking the current array and group
+ * paths so absolute field paths can be reconstructed for entries.
  *
  * @internal
  */
@@ -21,6 +32,14 @@ interface CollectionContext {
    * (e.g., 'items[0]' or 'orders[1].lineItems[2]').
    */
   arrayPath?: string;
+
+  /**
+   * Dot-joined ancestor group keys for fields nested inside one or more
+   * groups (e.g., 'address' or 'org.address'). Layout containers
+   * (page, row, container) do not contribute to this path. Reset at
+   * array boundaries — the array placeholder path takes over.
+   */
+  groupPath?: string;
 }
 
 /**
@@ -81,13 +100,16 @@ function traverseFields(fields: FieldDef<unknown>[], entries: DerivationEntry[],
   for (const field of fields) {
     collectFromField(field, entries, context);
 
-    // Recursively process container fields (page, row, group, array)
+    // Recursively process container fields (page, row, group, array, container)
     if (hasChildFields(field)) {
-      const childContext = { ...context };
+      const childContext: CollectionContext = { ...context };
 
-      // Update array path context if this is an array field
       if (field.type === 'array') {
+        // Array boundary: the array placeholder path takes over and any
+        // ancestor groupPath is reset for descendants (entries inside
+        // array items use `arrayPath.$.fieldKey` form).
         childContext.arrayPath = field.key;
+        childContext.groupPath = undefined;
 
         // Array fields have items that can be either FieldDef (primitive) or FieldDef[] (object).
         // Normalize all items to arrays and flatten for traversal.
@@ -106,10 +128,49 @@ function traverseFields(fields: FieldDef<unknown>[], entries: DerivationEntry[],
 
         traverseFields(normalizedChildren, entries, childContext);
       } else {
+        if (field.type === 'group' && field.key) {
+          // Group establishes a model boundary; descend with the field's
+          // key appended to the ancestor groupPath.
+          childContext.groupPath = context.groupPath ? `${context.groupPath}.${field.key}` : field.key;
+        }
+        // Layout containers (page, row, container) leave context unchanged.
+
         traverseFields(normalizeFieldsArray(field.fields) as FieldDef<unknown>[], entries, childContext);
       }
     }
   }
+}
+
+/**
+ * Builds the absolute field path for a derivation entry from the field's
+ * key and the current collection context.
+ *
+ * - Inside an array, returns `${arrayPath}.$.${fieldKey}` (the placeholder
+ *   form already used by the rest of the system). `groupPath` is reset at
+ *   array boundaries, so this branch never combines them.
+ * - Inside one or more groups, returns `${groupPath}.${fieldKey}`.
+ * - Otherwise returns `fieldKey` unchanged.
+ *
+ * @internal
+ */
+function buildEffectiveFieldKey(fieldKey: string, context: CollectionContext): string {
+  if (context.arrayPath) {
+    return `${context.arrayPath}.$.${fieldKey}`;
+  }
+  if (context.groupPath) {
+    return `${context.groupPath}.${fieldKey}`;
+  }
+  return fieldKey;
+}
+
+/**
+ * Replaces occurrences of `SELF_DEPENDENCY_TOKEN` in a `dependsOn` array
+ * with the field's own resolved absolute path.
+ *
+ * @internal
+ */
+function resolveSelfDependencies(deps: string[], effectiveFieldKey: string): string[] {
+  return deps.map((dep) => (dep === SELF_DEPENDENCY_TOKEN ? effectiveFieldKey : dep));
 }
 
 /**
@@ -152,8 +213,7 @@ function collectFromField(field: FieldDef<unknown>, entries: DerivationEntry[], 
  * @internal
  */
 function createShorthandEntry(fieldKey: string, expression: string, context: CollectionContext): DerivationEntry {
-  // Build the effective field key, including array path if in array context
-  const effectiveFieldKey = context.arrayPath ? `${context.arrayPath}.$.${fieldKey}` : fieldKey;
+  const effectiveFieldKey = buildEffectiveFieldKey(fieldKey, context);
 
   return {
     fieldKey: effectiveFieldKey,
@@ -181,8 +241,7 @@ function createShorthandEntry(fieldKey: string, expression: string, context: Col
  * @internal
  */
 function createLogicEntry(fieldKey: string, config: DerivationLogicConfig, context: CollectionContext): DerivationEntry {
-  // Build the effective field key, including array path if in array context
-  const effectiveFieldKey = context.arrayPath ? `${context.arrayPath}.$.${fieldKey}` : fieldKey;
+  const effectiveFieldKey = buildEffectiveFieldKey(fieldKey, context);
 
   // Runtime guards for HTTP and async derivations.
   // Mutual exclusivity and required fields are now enforced by TypeScript (via `source` discriminant).
@@ -217,7 +276,7 @@ function createLogicEntry(fieldKey: string, config: DerivationLogicConfig, conte
     }
   }
 
-  const dependsOn = extractDependencies(config);
+  const dependsOn = resolveSelfDependencies(extractDependencies(config), effectiveFieldKey);
   const condition = config.condition ?? true;
   const trigger = config.trigger ?? 'onChange';
 

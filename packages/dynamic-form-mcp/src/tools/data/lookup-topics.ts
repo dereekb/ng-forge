@@ -780,8 +780,12 @@ logic: [{ type: 'derivation', expression: '...', stopOnUserOverride: true, reEng
 
 // HTTP derivation (server-driven values)
 logic: [{ type: 'derivation', source: 'http', http: { url: '/api/rate', queryParams: { from: 'formValue.currency' } }, responseExpression: 'response.rate', dependsOn: ['currency'] }]
+
+// Self-dependency token: $self resolves to the field's own absolute path at collection time
+logic: [{ type: 'derivation', functionName: 'uppercase', dependsOn: ['$self'] }]
 \`\`\`
 Derivation is always defined ON the field that receives the computed value (self-targeting).
+\`dependsOn\` paths are absolute from the form root (e.g. \`'address.state'\`). Use \`'$self'\` to refer to the field's own absolute path without hard-coding ancestor group keys.
 **Variables:** \`formValue\`, \`fieldValue\`, \`fieldState\`, \`formFieldState\`, \`externalData\` (see topic: expression-variables)
 **For deriving component properties** (minDate, options, label): use \`targetProperty\` (see topic \`property-derivation\`)`,
 
@@ -845,6 +849,44 @@ Derivations are always defined ON the field that receives the computed value (se
   }]
 }
 \`\`\`
+
+## \`dependsOn\` Path Resolution
+
+\`dependsOn\` paths are **absolute from the form root**, dotted notation. A field nested under a group has the group's key in its path:
+
+\`\`\`typescript
+{
+  type: 'group', key: 'address',
+  fields: [
+    { key: 'state', type: 'input', logic: [{
+      type: 'derivation',
+      functionName: 'uppercaseState',
+      dependsOn: ['address.state']  // absolute path from root
+    }]}
+  ]
+}
+\`\`\`
+
+Layout containers (\`page\`, \`row\`, \`container\`) do **not** contribute to the path — only \`group\` fields do. Array fields use the \`'arrayKey.$.fieldKey'\` placeholder convention.
+
+### \`$self\` token
+
+Use \`'$self'\` in \`dependsOn\` to refer to the field's own absolute path. Useful for self-derivations on fields built by factory helpers, where the ancestor group keys aren't known at config-authoring time:
+
+\`\`\`typescript
+{
+  type: 'group', key: 'address',
+  fields: [
+    { key: 'state', type: 'input', logic: [{
+      type: 'derivation',
+      functionName: 'uppercaseState',
+      dependsOn: ['$self']  // resolves to 'address.state' at collection time
+    }]}
+  ]
+}
+\`\`\`
+
+\`$self\` works alongside other absolute deps and inside arrays (resolves to the array placeholder form, e.g. \`'items.$.name'\`).
 
 ## HTTP Derivation (Server-Driven Values)
 

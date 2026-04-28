@@ -33,6 +33,16 @@ const routes: Routes = [
     data: { scenario: getContainerNestingScenario('container-inside-row') },
   },
   {
+    path: 'container-inside-group',
+    loadComponent: () => import('../shared/test-scenario.component').then((m) => m.TestScenarioComponent),
+    data: { scenario: getContainerNestingScenario('container-inside-group') },
+  },
+  {
+    path: 'container-inside-group-self',
+    loadComponent: () => import('../shared/test-scenario.component').then((m) => m.TestScenarioComponent),
+    data: { scenario: getContainerNestingScenario('container-inside-group-self') },
+  },
+  {
     path: 'deeply-nested',
     loadComponent: () => import('../shared/test-scenario.component').then((m) => m.TestScenarioComponent),
     data: { scenario: getContainerNestingScenario('deeply-nested') },

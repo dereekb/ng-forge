@@ -2,12 +2,11 @@ import { FieldDef } from '../../definitions/base/field-def';
 import { FieldWithValidation } from '../../definitions/base/field-with-validation';
 import { DynamicFormError } from '../../errors/dynamic-form-error';
 import { DerivationLogicConfig, hasTargetProperty, isDerivationLogicConfig } from '../../models/logic/logic-config';
-import { hasChildFields } from '../../models/types/type-guards';
-import { normalizeFieldsArray } from '../../utils/object-utils';
-import { getNormalizedArrayMetadata } from '../../utils/array-field/normalized-array-metadata';
-import { extractExpressionDependencies, extractStringDependencies } from '../cross-field/cross-field-detector';
+import { extractStringDependencies } from '../cross-field/cross-field-detector';
 import { topologicalSort } from './derivation-sorter';
 import { DerivationCollection, DerivationEntry } from './derivation-types';
+import { extractDependenciesFromConfig } from './extract-dependencies';
+import { traverseFieldsWithContext } from './field-traversal';
 
 /**
  * Token in `dependsOn` arrays that resolves to the current field's own
@@ -101,9 +100,21 @@ interface CollectionContext {
  */
 export function collectDerivations(fields: FieldDef<unknown>[]): DerivationCollection {
   const entries: DerivationEntry[] = [];
-  const context: CollectionContext = {};
 
-  traverseFields(fields, entries, context);
+  traverseFieldsWithContext<CollectionContext>(fields, {}, (field, context) => collectFromField(field, entries, context), {
+    // Array boundary: the array placeholder path takes over and any
+    // ancestor groupPath is reset for descendants (entries inside
+    // array items use `arrayPath.$.fieldKey` form).
+    onArrayChild: (_, field) => ({ arrayPath: field.key, groupPath: undefined }),
+    onGroupChild: (parent, field) => {
+      // Group establishes a model boundary; descend with the field's
+      // key appended to the ancestor groupPath. Groups without a key
+      // (rare) act like layout containers — leave context unchanged.
+      if (!field.key) return {};
+      return { groupPath: parent.groupPath ? `${parent.groupPath}.${field.key}` : field.key };
+    },
+    // Layout containers (page, row, container) leave context unchanged.
+  });
 
   // Sort entries in topological order for efficient processing.
   // This ensures derivations are processed in dependency order,
@@ -111,73 +122,6 @@ export function collectDerivations(fields: FieldDef<unknown>[]): DerivationColle
   const sortedEntries = topologicalSort(entries);
 
   return { entries: sortedEntries };
-}
-
-/**
- * Recursively traverses field definitions to collect derivations.
- *
- * @internal
- */
-function traverseFields(fields: FieldDef<unknown>[], entries: DerivationEntry[], context: CollectionContext): void {
-  for (const field of fields) {
-    collectFromField(field, entries, context);
-
-    // Recursively process container fields (page, row, group, array, container)
-    if (hasChildFields(field)) {
-      const childContext: CollectionContext = { ...context };
-
-      if (field.type === 'array') {
-        // Array boundary: the array placeholder path takes over and any
-        // ancestor groupPath is reset for descendants (entries inside
-        // array items use `arrayPath.$.fieldKey` form).
-        childContext.arrayPath = field.key;
-        childContext.groupPath = undefined;
-
-        // Array fields have items that can be either FieldDef (primitive) or FieldDef[] (object).
-        // Normalize all items to arrays and flatten for traversal.
-        let arrayItems = normalizeFieldsArray(field.fields) as (FieldDef<unknown> | FieldDef<unknown>[])[];
-
-        // Simplified arrays expose their item shape only via Symbol metadata
-        // when initialized without a starting `value` — `fields` is empty in
-        // that case. Fall back to the metadata template so derivations declared
-        // inside it are still collected; the resulting placeholder entry path
-        // ('array.$.x') applies to every item materialized at runtime.
-        if (arrayItems.length === 0) {
-          const metadataTemplate = getNormalizedArrayMetadata(field)?.template;
-          if (metadataTemplate) {
-            arrayItems = [
-              Array.isArray(metadataTemplate)
-                ? [...(metadataTemplate as readonly FieldDef<unknown>[])]
-                : (metadataTemplate as FieldDef<unknown>),
-            ];
-          }
-        }
-
-        const normalizedChildren: FieldDef<unknown>[] = [];
-
-        for (const item of arrayItems) {
-          if (Array.isArray(item)) {
-            // Object item: FieldDef[] - add each field
-            normalizedChildren.push(...item);
-          } else {
-            // Primitive item: single FieldDef - add directly
-            normalizedChildren.push(item);
-          }
-        }
-
-        traverseFields(normalizedChildren, entries, childContext);
-      } else {
-        if (field.type === 'group' && field.key) {
-          // Group establishes a model boundary; descend with the field's
-          // key appended to the ancestor groupPath.
-          childContext.groupPath = context.groupPath ? `${context.groupPath}.${field.key}` : field.key;
-        }
-        // Layout containers (page, row, container) leave context unchanged.
-
-        traverseFields(normalizeFieldsArray(field.fields) as FieldDef<unknown>[], entries, childContext);
-      }
-    }
-  }
 }
 
 /**
@@ -372,7 +316,7 @@ function createLogicEntry(fieldKey: string, config: DerivationLogicConfig, conte
     }
   }
 
-  const dependsOn = resolveTokenDependencies(extractDependencies(config), effectiveFieldKey, context);
+  const dependsOn = resolveTokenDependencies(extractDependenciesFromConfig(config), effectiveFieldKey, context);
   const condition = config.condition ?? true;
   const trigger = config.trigger ?? 'onChange';
 
@@ -398,45 +342,4 @@ function createLogicEntry(fieldKey: string, config: DerivationLogicConfig, conte
     stopOnUserOverride: config.stopOnUserOverride,
     reEngageOnDependencyChange: config.reEngageOnDependencyChange,
   };
-}
-
-/**
- * Extracts all field dependencies from a derivation config.
- *
- * Combines dependencies from:
- * - Explicit `dependsOn` array (if provided, takes precedence)
- * - Condition expression
- * - Value expression
- * - Function name (defaults to '*' if no explicit dependsOn)
- *
- * @internal
- */
-function extractDependencies(config: DerivationLogicConfig): string[] {
-  const deps = new Set<string>();
-
-  // If explicit dependsOn is provided, use it as the primary source
-  // This allows users to override automatic detection and control
-  // when derivations are triggered
-  if (config.dependsOn && config.dependsOn.length > 0) {
-    config.dependsOn.forEach((dep) => deps.add(dep));
-  } else {
-    // Extract from expression (automatic dependency detection)
-    if (config.expression) {
-      const exprDeps = extractStringDependencies(config.expression);
-      exprDeps.forEach((dep) => deps.add(dep));
-    }
-
-    // Custom functions assume full form access if no explicit dependsOn
-    if (config.functionName) {
-      deps.add('*');
-    }
-  }
-
-  // Always extract from condition (these are additional runtime guards)
-  if (config.condition && config.condition !== true) {
-    const conditionDeps = extractExpressionDependencies(config.condition);
-    conditionDeps.forEach((dep) => deps.add(dep));
-  }
-
-  return Array.from(deps);
 }

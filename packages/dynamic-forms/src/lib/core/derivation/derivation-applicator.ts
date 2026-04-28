@@ -8,7 +8,6 @@ import { isEqual } from '../../utils/object-utils';
 import { parseArrayPath, resolveArrayPath, isArrayPlaceholderPath } from '../../utils/path-utils/path-utils';
 import { CustomFunction } from '../expressions/custom-function-types';
 import { evaluateCondition } from '../expressions/condition-evaluator';
-import { ExpressionParser } from '../expressions/parser/expression-parser';
 import { getNestedValue } from '../expressions/value-utils';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import {
@@ -20,6 +19,7 @@ import {
   DerivationProcessingResult,
 } from './derivation-types';
 import type { WarningTracker } from '../../utils/warning-tracker';
+import { computeValueFromEntry } from './compute-derived-value';
 import { MAX_DERIVATION_ITERATIONS } from './derivation-constants';
 import { DerivationLogger } from './derivation-logger.service';
 import { readFieldStateInfo, createFormFieldStateMap } from './field-state-extractor';
@@ -636,27 +636,10 @@ function computeDerivedValue(
   evalContext: EvaluationContext,
   applicatorContext: DerivationApplicatorContext,
 ): unknown {
-  // Static value
-  if (entry.value !== undefined) {
-    return entry.value;
-  }
-
-  // Expression
-  if (entry.expression) {
-    return ExpressionParser.evaluate(entry.expression, evalContext);
-  }
-
-  // Custom function
-  if (entry.functionName) {
-    const fn = applicatorContext.derivationFunctions?.[entry.functionName];
-    if (!fn) {
-      throw new Error(`Derivation function '${entry.functionName}' not found in customFnConfig.derivations`);
-    }
-    return fn(evalContext);
-  }
-
-  // No value source specified
-  throw new Error(`Derivation for ${entry.fieldKey} has no value source. ` + `Specify 'value', 'expression', or 'functionName'.`);
+  return computeValueFromEntry(entry, evalContext, {
+    derivationFunctions: applicatorContext.derivationFunctions,
+    subject: entry.fieldKey,
+  });
 }
 
 /**

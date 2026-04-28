@@ -2,14 +2,13 @@ import { Signal, untracked } from '@angular/core';
 import { EvaluationContext } from '../../models/expressions/evaluation-context';
 import { ConditionalExpression } from '../../models/expressions/conditional-expression';
 
-import { DynamicFormError } from '../../errors/dynamic-form-error';
 import { parseArrayPath, resolveArrayPath, isArrayPlaceholderPath } from '../../utils/path-utils/path-utils';
 import { CustomFunction } from '../expressions/custom-function-types';
 import { evaluateCondition } from '../expressions/condition-evaluator';
-import { ExpressionParser } from '../expressions/parser/expression-parser';
 import { getNestedValue } from '../expressions/value-utils';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import type { WarningTracker } from '../../utils/warning-tracker';
+import { computeValueFromEntry } from '../derivation/compute-derived-value';
 import { PropertyDerivationCollection, PropertyDerivationEntry } from './property-derivation-types';
 import { PropertyOverrideStore } from './property-override-store';
 
@@ -287,27 +286,9 @@ function computePropertyValue(
   evalContext: EvaluationContext,
   applicatorContext: PropertyDerivationApplicatorContext,
 ): unknown {
-  // Static value
-  if (entry.value !== undefined) {
-    return entry.value;
-  }
-
-  // Expression
-  if (entry.expression) {
-    return ExpressionParser.evaluate(entry.expression, evalContext);
-  }
-
-  // Custom function
-  if (entry.functionName) {
-    const fn = applicatorContext.derivationFunctions?.[entry.functionName];
-    if (!fn) {
-      throw new DynamicFormError(`Property derivation function '${entry.functionName}' not found in customFnConfig.derivations`);
-    }
-    return fn(evalContext);
-  }
-
-  throw new DynamicFormError(
-    `Property derivation for ${entry.fieldKey}.${entry.targetProperty} has no value source. ` +
-      `Specify 'value', 'expression', or 'functionName'.`,
-  );
+  return computeValueFromEntry(entry, evalContext, {
+    derivationFunctions: applicatorContext.derivationFunctions,
+    subject: `${entry.fieldKey}.${entry.targetProperty}`,
+    functionKind: 'Property derivation function',
+  });
 }

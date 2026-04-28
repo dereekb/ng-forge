@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { computed, DestroyRef, inject, InjectionToken, Injector, isSignal, Signal, untracked } from '@angular/core';
+import { computed, DestroyRef, inject, InjectionToken, Injector, Signal, untracked } from '@angular/core';
 import { DEV_MODE } from '../../utils/dev-mode';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { FieldTree } from '@angular/forms/signals';
@@ -35,6 +35,8 @@ import { DerivationLogger } from './derivation-logger.service';
 import { DERIVATION_WARNING_TRACKER } from './derivation-warning-tracker';
 import { createHttpDerivationStream, createStreamGuard, HttpDerivationStreamContext } from './http-derivation-stream';
 import { createAsyncDerivationStream } from './async-derivation-stream';
+import { getDebouncePeriods } from './debounce-period-utils';
+import { resolveExternalData } from './external-data-resolver';
 
 /**
  * Minimal configuration for creating a DerivationOrchestrator.
@@ -211,7 +213,7 @@ export class DerivationOrchestrator {
           if (!collection || !formAccessor) return of(null);
 
           // Get unique debounce periods from entries with trigger 'debounced'
-          const debouncePeriods = this.getDebouncePeriods(collection.entries);
+          const debouncePeriods = getDebouncePeriods(collection.entries);
           if (debouncePeriods.length === 0) return of(null);
 
           // merge: Process multiple debounce periods concurrently.
@@ -263,7 +265,7 @@ export class DerivationOrchestrator {
       rootForm: formAccessor,
       derivationFunctions: this.functionRegistry.getDerivationFunctions(),
       customFunctions: this.functionRegistry.getCustomFunctions(),
-      externalData: this.resolveExternalData(),
+      externalData: resolveExternalData(this.config.externalData),
       logger: this.logger,
       warningTracker: this.warningTracker,
       derivationLogger: untracked(() => this.config.derivationLogger()),
@@ -306,7 +308,7 @@ export class DerivationOrchestrator {
       rootForm: formAccessor,
       derivationFunctions: this.functionRegistry.getDerivationFunctions(),
       customFunctions: this.functionRegistry.getCustomFunctions(),
-      externalData: this.resolveExternalData(),
+      externalData: resolveExternalData(this.config.externalData),
       logger: this.logger,
       warningTracker: this.warningTracker,
       derivationLogger: untracked(() => this.config.derivationLogger()),
@@ -369,7 +371,7 @@ export class DerivationOrchestrator {
             logger: this.logger,
             derivationLogger: this.config.derivationLogger,
             customFunctions: () => this.functionRegistry.getCustomFunctions(),
-            externalData: () => this.resolveExternalData(),
+            externalData: () => resolveExternalData(this.config.externalData),
             warningTracker: this.warningTracker,
             guard$: this.streamGuard.guard$,
           };
@@ -454,7 +456,7 @@ export class DerivationOrchestrator {
             derivationLogger: this.config.derivationLogger,
             customFunctions: () => this.functionRegistry.getCustomFunctions(),
             asyncDerivationFunctions: () => this.functionRegistry.getAsyncDerivationFunctions(),
-            externalData: () => this.resolveExternalData(),
+            externalData: () => resolveExternalData(this.config.externalData),
             warningTracker: this.warningTracker,
           };
 
@@ -496,46 +498,6 @@ export class DerivationOrchestrator {
         return `${entry.fieldKey}:${JSON.stringify(config, Object.keys(config).sort())}`;
       }),
     );
-  }
-
-  /**
-   * Gets all unique debounce periods from entries with trigger 'debounced'.
-   */
-  private getDebouncePeriods(entries: DerivationEntry[]): number[] {
-    const periods = new Set<number>();
-    for (const entry of entries) {
-      if (entry.trigger === 'debounced') {
-        periods.add(entry.debounceMs ?? DEFAULT_DEBOUNCE_MS);
-      }
-    }
-    return Array.from(periods);
-  }
-
-  /**
-   * Resolves external data signals to their current values without creating dependencies.
-   *
-   * Uses `untracked()` to read signals without establishing reactive dependencies,
-   * which is important for derivations that shouldn't re-trigger on every external data change.
-   *
-   * @returns Record of resolved external data values, or undefined if no external data.
-   */
-  private resolveExternalData(): Record<string, unknown> | undefined {
-    const externalDataRecord = untracked(() => this.config.externalData?.());
-
-    if (!externalDataRecord) {
-      return undefined;
-    }
-
-    const resolved: Record<string, unknown> = {};
-    for (const [key, signal] of Object.entries(externalDataRecord)) {
-      if (isSignal(signal)) {
-        resolved[key] = untracked(() => signal());
-      } else {
-        resolved[key] = signal;
-      }
-    }
-
-    return resolved;
   }
 }
 

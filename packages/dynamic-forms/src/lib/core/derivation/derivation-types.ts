@@ -1,7 +1,6 @@
-import { ConditionalExpression } from '../../models/expressions/conditional-expression';
 import type { FormFieldStateMap } from '../../models/expressions/field-state-context';
 import { HttpRequestConfig } from '../../models/http/http-request-config';
-import { DerivationLogicConfig, LogicTrigger } from '../../models/logic/logic-config';
+import { BaseDerivationEntry } from './derivation-entry-base';
 
 /**
  * Entry representing a collected derivation from field definitions.
@@ -12,57 +11,12 @@ import { DerivationLogicConfig, LogicTrigger } from '../../models/logic/logic-co
  * All derivations are self-targeting: the `fieldKey` is both where the
  * derivation is defined AND where the computed value will be set.
  *
+ * Extends {@link BaseDerivationEntry} with derivation-pipeline specific fields
+ * (HTTP/async sources, shorthand flag, user-override controls).
+ *
  * @public
  */
-export interface DerivationEntry {
-  /**
-   * The key of the field where this derivation is defined and targets.
-   *
-   * Derivations always target the field they are defined on (self-targeting).
-   * For array fields, this may include a placeholder path like 'items.$.lineTotal'
-   * which is resolved to actual indices at runtime.
-   */
-  fieldKey: string;
-
-  /**
-   * Field keys that this derivation depends on.
-   *
-   * Extracted from conditions and expressions.
-   * Used for:
-   * - Cycle detection
-   * - Reactive dependency tracking
-   * - Determining evaluation order
-   */
-  dependsOn: string[];
-
-  /**
-   * Condition that determines when this derivation applies.
-   *
-   * Defaults to `true` (always apply) if not specified.
-   */
-  condition: ConditionalExpression | boolean;
-
-  /**
-   * Static value to set on this field.
-   *
-   * Mutually exclusive with `expression` and `functionName`.
-   */
-  value?: unknown;
-
-  /**
-   * JavaScript expression to evaluate for the derived value.
-   *
-   * Mutually exclusive with `value` and `functionName`.
-   */
-  expression?: string;
-
-  /**
-   * Name of a registered custom derivation function.
-   *
-   * Mutually exclusive with `value`, `expression`, and `http`.
-   */
-  functionName?: string;
-
+export interface DerivationEntry extends BaseDerivationEntry {
   /**
    * HTTP request configuration for server-driven derivations.
    *
@@ -87,42 +41,11 @@ export interface DerivationEntry {
   responseExpression?: string;
 
   /**
-   * When to evaluate the derivation.
-   *
-   * - `onChange`: Evaluate immediately when dependencies change (default)
-   * - `debounced`: Evaluate after value has stabilized for debounceMs
-   *
-   * @default 'onChange'
-   */
-  trigger: LogicTrigger;
-
-  /**
-   * Debounce duration in milliseconds.
-   *
-   * Only used when `trigger` is 'debounced'.
-   * @default 500
-   */
-  debounceMs?: number;
-
-  /**
    * Whether this derivation was created from the shorthand `derivation` property.
    *
    * Shorthand derivations use a string expression directly on the field.
    */
   isShorthand: boolean;
-
-  /**
-   * The original logic config if this entry was created from a full logic config.
-   */
-  originalConfig?: DerivationLogicConfig;
-
-  /**
-   * Optional debug name for easier identification in logs.
-   *
-   * Copied from the originalConfig if provided. When set, this name
-   * appears in verbose derivation logs instead of the field key.
-   */
-  debugName?: string;
 
   /**
    * When true, the derivation stops running after the user manually

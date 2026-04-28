@@ -1,5 +1,6 @@
 import { computed, inject, isSignal, Signal } from '@angular/core';
 import { FieldDef } from '../../definitions/base/field-def';
+import { FieldWithValidation } from '../../definitions/base/field-with-validation';
 import { FieldMeta } from '../../definitions/base/field-meta';
 import { FieldTypeDefinition } from '../../models/field-type';
 import { ARRAY_CONTEXT } from '../../models/field-signal-context.token';
@@ -7,7 +8,25 @@ import { ArrayContext } from '../../mappers/types';
 import { baseFieldMapper } from '../../mappers/base/base-field-mapper';
 import { PROPERTY_OVERRIDE_STORE } from '../../core/property-derivation/property-override-store';
 import { applyPropertyOverrides } from '../../core/property-derivation/apply-property-overrides';
-import { buildPropertyOverrideKey, PLACEHOLDER_INDEX } from '../../core/property-derivation/property-override-key';
+import { buildPropertyOverrideKey } from '../../core/property-derivation/property-override-key';
+import { hasTargetProperty, isDerivationLogicConfig } from '../../models/logic/logic-config';
+
+/**
+ * Returns true if the field has any property-derivation logic entries
+ * (type: 'derivation' with a non-empty targetProperty). Mirrors the inclusion
+ * rule used by `collectPropertyDerivations`, so the mapper and orchestrator
+ * agree on which fields participate in property overrides — without depending
+ * on whether the orchestrator's registration effect has run yet (which it
+ * hasn't on the resolveFieldSync path with a warm COMPONENT_CACHE).
+ */
+function fieldHasPropertyDerivations(fieldDef: FieldDef<unknown>): boolean {
+  const logic = (fieldDef as FieldDef<unknown> & FieldWithValidation).logic;
+  if (!logic || logic.length === 0) return false;
+  for (const entry of logic) {
+    if (isDerivationLogicConfig(entry) && hasTargetProperty(entry)) return true;
+  }
+  return false;
+}
 
 /**
  * Merges forwarded props into meta, with meta taking precedence.
@@ -126,12 +145,13 @@ export function mapFieldToInputs(
   const indexSignal = arrayContext?.index;
   const hasArrayContext = indexSignal !== undefined && isSignal(indexSignal);
 
-  // Fast-path check for property overrides: only fields with registered derivations
-  // enter the computed() wrapper for overrides. hasField() is a non-reactive Map.has() — O(1).
-  // Uses PLACEHOLDER_INDEX to produce the wildcard format (e.g., 'items.$.endDate') matching
-  // what the collector/orchestrator registers. The computed block below uses a concrete index instead.
-  const hasOverrides =
-    store?.hasField(buildPropertyOverrideKey(arrayContext?.arrayKey, arrayContext ? PLACEHOLDER_INDEX : undefined, fieldDef.key)) ?? false;
+  // Fast-path check for property overrides: only fields whose definition declares
+  // a property-derivation enter the computed() wrapper. We inspect the FieldDef
+  // directly rather than asking the store, because the store's registration
+  // effect may not have fired yet when the mapper runs in the resolveFieldSync
+  // path (warm COMPONENT_CACHE). Both the mapper and the orchestrator's
+  // collector apply the same inclusion rule, so the answers always agree.
+  const hasOverrides = fieldHasPropertyDerivations(fieldDef);
 
   // Fast path: no transformations needed
   if (!hasPropsForwarding && !hasArrayContext && !hasOverrides) {

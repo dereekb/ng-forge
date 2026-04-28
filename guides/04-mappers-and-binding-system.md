@@ -178,9 +178,71 @@ export function valueFieldMapper(fieldDef: BaseValueField<any, any>, options: Va
 
 **Note:** The actual implementation is simpler than often assumed. The `baseFieldMapper` handles most properties (label, placeholder, className, props, etc.), and `valueFieldMapper` only adds the `field` binding.
 
-**Usage:** Most common mapper. Used for input, select, textarea, datepicker, slider, etc.
+**Usage:** Most common mapper. Used for input, textarea, slider, etc.
 
-### 3. checkboxFieldMapper
+### 3. optionsFieldMapper
+
+Maps fields with selectable options (select, radio, multi-checkbox):
+
+```typescript
+export function optionsFieldMapper<T, TProps>(fieldDef: FieldWithOptions<T, TProps>): Signal<Record<string, unknown>> {
+  const ctx = resolveValueFieldContext();
+  const defaultProps = inject(DEFAULT_PROPS);
+  const defaultValidationMessages = inject(DEFAULT_VALIDATION_MESSAGES);
+
+  return computed(() => {
+    // Cast to BaseValueField - safe because all FieldWithOptions types extend BaseValueField
+    const inputs = buildValueFieldInputs(fieldDef as BaseValueField<TProps, unknown>, ctx, defaultProps(), defaultValidationMessages());
+
+    // Add options property
+    inputs['options'] = fieldDef.options;
+
+    return inputs;
+  });
+}
+```
+
+**Usage:** For select dropdowns, radio button groups, and multi-checkbox fields. The mapper reuses the base value field logic and adds the `options` array.
+
+### 4. datepickerFieldMapper
+
+Maps datepicker fields with date range constraints:
+
+```typescript
+export function datepickerFieldMapper<TProps>(fieldDef: DatepickerField<TProps>): Signal<Record<string, unknown>> {
+  const ctx = resolveValueFieldContext();
+  const defaultProps = inject(DEFAULT_PROPS);
+  const defaultValidationMessages = inject(DEFAULT_VALIDATION_MESSAGES);
+
+  return computed(() => {
+    const inputs = buildValueFieldInputs(fieldDef, ctx, defaultProps(), defaultValidationMessages());
+
+    // Add datepicker-specific properties, converting strings to Date objects
+    if (fieldDef.minDate !== undefined) {
+      inputs['minDate'] = toDate(fieldDef.minDate);
+    }
+    if (fieldDef.maxDate !== undefined) {
+      inputs['maxDate'] = toDate(fieldDef.maxDate);
+    }
+    if (fieldDef.startAt !== undefined) {
+      inputs['startAt'] = toDate(fieldDef.startAt);
+    }
+
+    return inputs;
+  });
+}
+```
+
+**Key Features:**
+
+- Automatically converts string dates to Date objects for UI library compatibility
+- Supports `minDate` and `maxDate` for date range constraints
+- `startAt` property controls the initial calendar view
+- Handles null/undefined values safely
+
+**Usage:** For datepicker fields across Material, PrimeNG, Bootstrap, and Ionic adapters.
+
+### 5. checkboxFieldMapper
 
 Maps boolean fields (checkbox, toggle):
 
@@ -220,7 +282,7 @@ export function checkboxFieldMapper(fieldDef: BaseCheckedField<any>, options: Fi
 
 **Usage:** For checkbox and toggle fields.
 
-### 4. buttonFieldMapper
+### 6. buttonFieldMapper
 
 Maps button fields (no form binding):
 
@@ -255,7 +317,7 @@ export function buttonFieldMapper(fieldDef: ButtonField<any, any>, options: Fiel
 
 **Usage:** For button fields. Note: No form field binding.
 
-### 5. groupFieldMapper
+### 7. groupFieldMapper
 
 Maps group container fields:
 
@@ -274,7 +336,7 @@ export function groupFieldMapper(fieldDef: GroupField<any>, options: FieldMapper
 
 **Usage:** For group containers (nested objects in form value).
 
-### 6. rowFieldMapper
+### 8. rowFieldMapper
 
 Maps row layout fields:
 
@@ -294,7 +356,7 @@ export function rowFieldMapper(fieldDef: RowField, options: FieldMapperOptions):
 
 **Usage:** For row layout (children flattened to parent level).
 
-### 7. pageFieldMapper
+### 9. pageFieldMapper
 
 Maps page fields (multi-step forms):
 

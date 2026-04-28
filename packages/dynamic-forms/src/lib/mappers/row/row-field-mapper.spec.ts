@@ -50,6 +50,22 @@ describe('rowFieldMapper', () => {
     expect(inputs).toHaveProperty('field');
   });
 
+  it('should rewrite the field type to container with a synthesized row wrapper', () => {
+    // `row` is a synthetic field type — it resolves to ContainerFieldComponent
+    // with a `{ type: 'row' }` wrapper, so the field passed to the container
+    // component must report type === 'container'.
+    const fieldDef: RowField = {
+      key: 'syntheticRow',
+      type: 'row',
+      fields: [{ key: 'child', type: 'input' }],
+    };
+
+    const inputs = testMapper(fieldDef);
+    const field = inputs['field'] as Record<string, unknown>;
+    expect(field['type']).toBe('container');
+    expect(field['wrappers']).toEqual([{ type: 'row' }]);
+  });
+
   it('should create inputs with key, field, and className when className is provided', () => {
     const fieldDef: RowField = {
       key: 'complexRow',

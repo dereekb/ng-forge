@@ -108,18 +108,7 @@ export default class ContainerFieldComponent {
   });
 
   constructor() {
-    // `row` is a virtual field type backed by ContainerFieldComponent — at
-    // runtime the spread in rowFieldMapper preserves `type: 'row'` on the
-    // field input, even though the declared type is `ContainerField`. Widen
-    // here so `(events)` consumers filtering by `componentType === 'row'`
-    // keep receiving emissions.
-    setupContainerInitEffect(
-      this.resolvedFields,
-      this.eventBus,
-      () => ((this.field().type as string) === 'row' ? 'row' : 'container'),
-      () => this.field().key,
-      this.injector,
-    );
+    setupContainerInitEffect(this.resolvedFields, this.eventBus, 'container', () => this.field().key, this.injector);
 
     createWrapperChainController({
       vcr: this.wrapperContainer,

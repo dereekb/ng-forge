@@ -29,8 +29,7 @@ type TestFormConfig = {
     | { type: 'group'; key: string; label: string; fields: any[] }
     | { type: 'page'; key: string; label?: string; fields: any[] }
     | { type: 'container'; key: string; fields: any[]; wrappers: any[] }
-    | { type: 'array'; key: string; fields: any[]; wrappers?: any[] }
-    | { type: 'array'; key: string; template: any; value?: any[]; wrappers?: any[] }
+    | { type: 'array'; key: string; template?: any; value?: any[]; wrappers?: any[] }
   >;
 };
 
@@ -2387,6 +2386,193 @@ describe('DynamicFormComponent', () => {
       const rowContainer = fixture.nativeElement.querySelector('[data-testid="nameRow"]');
       const rowElement = rowContainer?.querySelector('df-row-wrapper');
       expect(rowElement?.classList.contains('df-row')).toBe(true);
+    });
+
+    it('should handle container containing a container (children flattened through both)', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'outer',
+            type: 'container',
+            fields: [
+              {
+                key: 'inner',
+                type: 'container',
+                fields: [
+                  { key: 'firstName', type: 'input', label: 'First', value: 'Ada' },
+                  { key: 'lastName', type: 'input', label: 'Last', value: 'Lovelace' },
+                ],
+                wrappers: [],
+              },
+              { key: 'email', type: 'input', label: 'Email', value: 'ada@example.com' },
+            ],
+            wrappers: [],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { component, fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // Both outer and inner containers flatten — every leaf lives at the top level.
+      expect(component.formValue()).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+      });
+    });
+
+    it('should flatten page -> container -> container', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'page1',
+            type: 'page',
+            fields: [
+              {
+                key: 'outer',
+                type: 'container',
+                fields: [
+                  {
+                    key: 'inner',
+                    type: 'container',
+                    fields: [
+                      { key: 'firstName', type: 'input', label: 'First', value: 'Ada' },
+                      { key: 'lastName', type: 'input', label: 'Last', value: 'Lovelace' },
+                    ],
+                    wrappers: [],
+                  },
+                  { key: 'email', type: 'input', label: 'Email', value: 'ada@example.com' },
+                ],
+                wrappers: [],
+              },
+            ],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { component, fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // page and both containers flatten — every leaf lives at the top level.
+      expect(component.formValue()).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+      });
+    });
+
+    it('should flatten three levels of nested containers', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'outer',
+            type: 'container',
+            fields: [
+              {
+                key: 'middle',
+                type: 'container',
+                fields: [
+                  {
+                    key: 'inner',
+                    type: 'container',
+                    fields: [
+                      { key: 'firstName', type: 'input', label: 'First', value: 'Ada' },
+                      { key: 'lastName', type: 'input', label: 'Last', value: 'Lovelace' },
+                    ],
+                    wrappers: [],
+                  },
+                  { key: 'middleSibling', type: 'input', label: 'Middle Sibling', value: 'm' },
+                ],
+                wrappers: [],
+              },
+              { key: 'outerSibling', type: 'input', label: 'Outer Sibling', value: 'o' },
+            ],
+            wrappers: [],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { component, fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // All three container levels flatten — every leaf and sibling lives at the top level.
+      expect(component.formValue()).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        middleSibling: 'm',
+        outerSibling: 'o',
+      });
+    });
+
+    it('should flatten nested rows (row inside row)', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'outerRow',
+            type: 'row',
+            fields: [
+              {
+                key: 'innerRow',
+                type: 'row',
+                fields: [
+                  { key: 'firstName', type: 'input', label: 'First', value: 'Ada' },
+                  { key: 'lastName', type: 'input', label: 'Last', value: 'Lovelace' },
+                ],
+              },
+              { key: 'email', type: 'input', label: 'Email', value: 'ada@example.com' },
+            ],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { component, fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // Both row levels flatten — every leaf lives at the top level.
+      expect(component.formValue()).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: 'ada@example.com',
+      });
+    });
+
+    it('should flatten container -> row -> container -> input', async () => {
+      const config = {
+        fields: [
+          {
+            key: 'outer',
+            type: 'container',
+            fields: [
+              {
+                key: 'middleRow',
+                type: 'row',
+                fields: [
+                  {
+                    key: 'inner',
+                    type: 'container',
+                    fields: [
+                      { key: 'firstName', type: 'input', label: 'First', value: 'Ada' },
+                      { key: 'lastName', type: 'input', label: 'Last', value: 'Lovelace' },
+                    ],
+                    wrappers: [],
+                  },
+                ],
+              },
+            ],
+            wrappers: [],
+          },
+        ],
+      } as TestFormConfig;
+
+      const { component, fixture } = createComponent(config);
+      await waitForDynamicComponents(fixture);
+
+      // container -> row -> container all flatten — leaves live at the top level.
+      expect(component.formValue()).toEqual({
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      });
     });
 
     it('should handle container containing a group with nested container', async () => {

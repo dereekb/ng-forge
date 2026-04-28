@@ -19,10 +19,10 @@ import { WrapperConfig } from '../../models/wrapper-type';
  * - Supports a `wrappers` array that chains wrapper components around the children
  * - Uses imperative `ViewContainerRef.createComponent()` for the wrapper chain
  *
- * TypeScript cannot enforce field nesting rules due to circular dependency limitations.
- * For documentation: Containers follow the same nesting rules as rows — they should
- * contain groups and leaf fields, but NOT pages, other rows, or hidden fields.
- * Runtime validation enforces these rules.
+ * Containers are pure layout primitives that flatten their children into the
+ * parent form, so any registered field type may appear inside — including
+ * pages, hidden fields, rows, and other containers (see
+ * {@link ContainerAllowedChildren}).
  *
  * @example
  * ```typescript

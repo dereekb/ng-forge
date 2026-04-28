@@ -24,7 +24,10 @@ export function rowFieldMapper(fieldDef: RowField): Signal<Record<string, unknow
     // Rebuilt each emission so logic-driven updates to fieldDef (e.g. `disabled`)
     // flow through. Shallow spread is safe while RowField has no nested
     // mutable props; add a deep-clone if that stops being true.
-    const containerField = { ...fieldDef, wrappers: ROW_WRAPPERS };
+    // `type` is rewritten to 'container' because `row` is a synthetic field
+    // type — the runtime renders it as a ContainerField with a synthesized
+    // `{ type: 'row' }` wrapper.
+    const containerField = { ...fieldDef, type: 'container', wrappers: ROW_WRAPPERS };
 
     const inputs: Record<string, unknown> = {
       key: fieldDef.key,

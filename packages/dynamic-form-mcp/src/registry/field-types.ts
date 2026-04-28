@@ -337,17 +337,20 @@ export const FIELD_TYPES: FieldTypeInfo[] = [
         name: 'fields',
         type: 'RowAllowedChildren[]',
         description:
-          'Child fields to render horizontally. Allowed: groups, arrays, VALUE fields (input, select, etc). NOT ALLOWED: pages, rows, hidden fields',
+          'Child fields to render horizontally. Allowed: groups, arrays, containers, nested rows, hidden fields, and value fields (input, select, etc). NOT ALLOWED: pages',
         required: true,
       },
     },
     validationSupported: false,
     source: 'core',
-    allowedIn: ['top-level', 'page', 'group', 'array'],
-    notAllowedIn: ['row'],
+    allowedIn: ['top-level', 'page', 'group', 'array', 'row', 'container'],
+    notAllowedIn: [],
     canContain: [
       'group',
       'array',
+      'container',
+      'row',
+      'hidden',
       'input',
       'textarea',
       'select',
@@ -363,7 +366,7 @@ export const FIELD_TYPES: FieldTypeInfo[] = [
       'next',
       'previous',
     ],
-    cannotContain: ['page', 'row', 'hidden'],
+    cannotContain: ['page'],
     example: `{
   key: 'nameRow',
   type: 'row',
@@ -375,9 +378,7 @@ export const FIELD_TYPES: FieldTypeInfo[] = [
   ]
 }
 // NOT ALLOWED in rows:
-// - type: 'hidden' (hidden fields cannot be inside rows)
-// - type: 'page' (pages are top-level only)
-// - type: 'row' (no nested rows)`,
+// - type: 'page' (pages are top-level only)`,
     minimalExample: `{ key: 'row1', type: 'row', fields: [...] }`,
   },
   {

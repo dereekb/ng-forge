@@ -38,7 +38,7 @@ export function getFieldDefaultValue(field: FieldDef<unknown>, registry: Map<str
     return undefined;
   }
 
-  // Flatten fields (row/page) return flattened object of children's values
+  // Flatten fields (row/page/container) return flattened object of children's values
   // This is used by array fields to get the template structure
   // Note: fieldsToDefaultValues will skip these at top-level since they have keys and return objects
   if (valueHandling === 'flatten' && 'fields' in field && field.fields) {
@@ -47,11 +47,17 @@ export function getFieldDefaultValue(field: FieldDef<unknown>, registry: Map<str
     // Collect only fields that contribute values (exclude buttons, text, etc.)
     const flattenedValues: Record<string, unknown> = {};
     for (const childField of childFields) {
-      if ('key' in childField && childField.key) {
-        const childValue = getFieldDefaultValue(childField, registry);
-        if (childValue !== undefined) {
-          flattenedValues[childField.key] = childValue;
-        }
+      const childValueHandling = getFieldValueHandling(childField.type, registry);
+      if (childValueHandling === 'exclude') continue;
+
+      const childValue = getFieldDefaultValue(childField, registry);
+      if (childValue === undefined) continue;
+
+      if (childValueHandling === 'flatten' && childValue && typeof childValue === 'object' && !Array.isArray(childValue)) {
+        // Nested flatten field — its value is already flat; spread it up.
+        Object.assign(flattenedValues, childValue as Record<string, unknown>);
+      } else if ('key' in childField && childField.key) {
+        flattenedValues[childField.key] = childValue;
       }
     }
 
@@ -69,20 +75,17 @@ export function getFieldDefaultValue(field: FieldDef<unknown>, registry: Map<str
     const groupDefaults: Record<string, unknown> = {};
     for (const childField of fields) {
       const childValueHandling = getFieldValueHandling(childField.type, registry);
+      if (childValueHandling === 'exclude') continue;
 
-      // Flatten row/page fields into the group (they are presentational containers)
-      if (childValueHandling === 'flatten' && 'fields' in childField && childField.fields) {
-        const nestedFields = childField.fields as readonly FieldDef<unknown>[];
-        for (const nestedField of nestedFields) {
-          if ('key' in nestedField && nestedField.key) {
-            const nestedValue = getFieldDefaultValue(nestedField, registry);
-            if (nestedValue !== undefined) {
-              groupDefaults[nestedField.key] = nestedValue;
-            }
-          }
+      const childValue = getFieldDefaultValue(childField, registry);
+
+      if (childValueHandling === 'flatten') {
+        // Flatten container/row/page values into the group (they are presentational containers).
+        // The recursive call already returns a flat object — spread it directly.
+        if (childValue && typeof childValue === 'object' && !Array.isArray(childValue)) {
+          Object.assign(groupDefaults, childValue as Record<string, unknown>);
         }
       } else if ('key' in childField && childField.key) {
-        const childValue = getFieldDefaultValue(childField, registry);
         if (childValue !== undefined) {
           groupDefaults[childField.key] = childValue;
         }

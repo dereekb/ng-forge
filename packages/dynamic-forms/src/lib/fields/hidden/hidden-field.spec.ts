@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { HiddenField, isHiddenField } from '../../definitions/default/hidden-field';
 import { FieldDef } from '../../definitions/base/field-def';
-import { validateRowNesting, RowField } from '../../definitions/default/row-field';
+import { RowField } from '../../definitions/default/row-field';
 
 describe('HiddenField', () => {
   describe('type definition', () => {
@@ -114,67 +114,47 @@ describe('HiddenField', () => {
     });
   });
 
-  describe('row nesting validation (warnings)', () => {
-    it('should detect hidden fields directly inside rows', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          { type: 'input', key: 'name', value: '' },
-          { type: 'hidden', key: 'id', value: '123' },
-        ],
-      } as RowField;
+  describe('row container nesting (permissive)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      // Returns false when hidden fields are present (triggers warning)
-      expect(validateRowNesting(row)).toBe(false);
+    afterEach(() => {
+      warnSpy.mockClear();
     });
 
-    it('should detect hidden fields inside groups within rows', () => {
-      const row = {
+    it('accepts a hidden field as a direct child of a row without a cast', () => {
+      const row: RowField = {
         type: 'row',
+        key: 'rowWithHidden',
+        fields: [
+          { type: 'text', key: 'label', label: 'Name' },
+          { type: 'hidden', key: 'id', value: '123' },
+        ],
+      };
+
+      const hiddenChild = row.fields.find((f) => f.type === 'hidden');
+      expect(hiddenChild).toBeDefined();
+      expect(hiddenChild && isHiddenField(hiddenChild)).toBe(true);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('accepts hidden fields nested inside groups within rows', () => {
+      const row: RowField = {
+        type: 'row',
+        key: 'rowWithGroup',
         fields: [
           {
             type: 'group',
             key: 'data',
             fields: [
-              { type: 'input', key: 'name', value: '' },
+              { type: 'text', key: 'label', label: 'Name' },
               { type: 'hidden', key: 'id', value: '123' },
             ],
           },
         ],
-      } as RowField;
+      };
 
-      // Returns false when hidden fields are present (triggers warning)
-      expect(validateRowNesting(row)).toBe(false);
-    });
-
-    it('should pass for rows without hidden fields', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          { type: 'input', key: 'firstName', value: '' },
-          { type: 'input', key: 'lastName', value: '' },
-        ],
-      } as RowField;
-
-      expect(validateRowNesting(row)).toBe(true);
-    });
-
-    it('should pass for rows with groups containing only visible fields', () => {
-      const row = {
-        type: 'row',
-        fields: [
-          {
-            type: 'group',
-            key: 'name',
-            fields: [
-              { type: 'input', key: 'first', value: '' },
-              { type: 'input', key: 'last', value: '' },
-            ],
-          },
-        ],
-      } as RowField;
-
-      expect(validateRowNesting(row)).toBe(true);
+      expect(row.fields).toHaveLength(1);
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 });

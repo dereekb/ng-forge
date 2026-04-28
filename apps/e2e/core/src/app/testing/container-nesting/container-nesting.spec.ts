@@ -1,7 +1,14 @@
+import type { Locator } from '@playwright/test';
 import { expect, setupConsoleCheck, setupTestLogging, test } from '../shared/fixtures';
 
 setupTestLogging();
 setupConsoleCheck();
+
+async function fillVisibleInput(scenario: Locator, selector: string, value: string): Promise<void> {
+  const input = scenario.locator(selector);
+  await expect(input).toBeVisible({ timeout: 5000 });
+  await input.fill(value);
+}
 
 test.describe('Container Nesting E2E Tests', () => {
   // Array inside group (group > row > array) is a known library limitation.
@@ -104,6 +111,44 @@ test.describe('Container Nesting E2E Tests', () => {
       expect(products[0]['product']).toBe('Widget');
       expect(products[0]['price']).toBe(9.99);
       expect(products[0]['quantity']).toBe(10);
+    });
+  });
+
+  test.describe('Row Inside Container', () => {
+    test('should render a row inside a container and submit the flat values', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/row-inside-container');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('row-inside-container');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      await fillVisibleInput(scenario, '#street input', '500 Forge Ln');
+      await fillVisibleInput(scenario, '#unit input', '4B');
+      await fillVisibleInput(scenario, '#city input', 'Springfield');
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      // Container + row are both layout-only — values flatten into the parent.
+      expect(data['street']).toBe('500 Forge Ln');
+      expect(data['unit']).toBe('4B');
+      expect(data['city']).toBe('Springfield');
+    });
+  });
+
+  test.describe('Container Inside Row', () => {
+    test('should render a container inside a row and submit the flat values', async ({ page, helpers }) => {
+      await page.goto('/#/test/container-nesting/container-inside-row');
+      await page.waitForLoadState('networkidle');
+      const scenario = helpers.getScenario('container-inside-row');
+      await expect(scenario).toBeVisible({ timeout: 10000 });
+
+      await fillVisibleInput(scenario, '#firstName input', 'Ada');
+      await fillVisibleInput(scenario, '#nickname input', 'Lovelace');
+      await fillVisibleInput(scenario, '#pronouns input', 'she/her');
+
+      const data = await helpers.submitFormAndCapture(scenario);
+      // Row + container are both layout-only — values flatten into the parent.
+      expect(data['firstName']).toBe('Ada');
+      expect(data['nickname']).toBe('Lovelace');
+      expect(data['pronouns']).toBe('she/her');
     });
   });
 

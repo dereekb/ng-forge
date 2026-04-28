@@ -130,7 +130,7 @@ function hasAnyPageFields(fields: FieldDef<unknown>[]): boolean {
     }
 
     // Check nested fields in container types
-    if (isContainerWithFields(field) && (field.type === 'row' || field.type === 'group')) {
+    if (!isPageField(field) && isContainerWithFields(field)) {
       if (hasAnyPageFields(field.fields)) {
         return true;
       }
@@ -155,7 +155,7 @@ function hasNestedPageFields(fields: FieldDef<unknown>[]): boolean {
     }
 
     // Check other container types for nested pages
-    if (isContainerWithFields(field) && (field.type === 'row' || field.type === 'group')) {
+    if (!isPageField(field) && isContainerWithFields(field)) {
       if (hasNestedPageFields(field.fields)) {
         return true;
       }

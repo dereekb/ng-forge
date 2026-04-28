@@ -153,6 +153,81 @@ describe('form-mode-validator', () => {
         expect(result.isValid).toBe(false);
         expect(result.errors.length).toBeGreaterThan(0);
       });
+
+      it('should detect nested page errors when wrapped in a container', () => {
+        const fields = [
+          {
+            type: 'page',
+            key: 'page1',
+            fields: [
+              {
+                type: 'container',
+                key: 'container1',
+                wrappers: [],
+                fields: [{ type: 'page', key: 'nested', fields: [] }],
+              },
+            ],
+          },
+        ];
+
+        const result = FormModeValidator.validateFormConfiguration(fields as any);
+
+        expect(result.isValid).toBe(false);
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+
+      it('should detect nested page errors when buried under container > row', () => {
+        const fields = [
+          {
+            type: 'page',
+            key: 'page1',
+            fields: [
+              {
+                type: 'container',
+                key: 'container1',
+                wrappers: [],
+                fields: [
+                  {
+                    type: 'row',
+                    key: 'row1',
+                    fields: [{ type: 'page', key: 'nested', fields: [] }],
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+
+        const result = FormModeValidator.validateFormConfiguration(fields as any);
+
+        expect(result.isValid).toBe(false);
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+
+      it('should validate paged form with container holding leaf fields', () => {
+        const fields = [
+          {
+            type: 'page',
+            key: 'page1',
+            fields: [
+              {
+                type: 'container',
+                key: 'container1',
+                wrappers: [],
+                fields: [
+                  { type: 'input', key: 'name' },
+                  { type: 'input', key: 'email' },
+                ],
+              },
+            ],
+          },
+        ];
+
+        const result = FormModeValidator.validateFormConfiguration(fields as any);
+
+        expect(result.isValid).toBe(true);
+        expect(result.mode).toBe('paged');
+      });
     });
 
     // Mixed mode no longer exists in current codebase

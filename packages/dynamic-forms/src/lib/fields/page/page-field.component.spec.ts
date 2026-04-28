@@ -165,5 +165,88 @@ describe('PageField validation functions', () => {
 
       expect(validatePageNesting(pageField)).toBe(false);
     });
+
+    it('should return false for page with nested page inside container', () => {
+      const pageField: PageField<any> = {
+        key: 'invalid-page',
+        type: 'page',
+        fields: [
+          {
+            key: 'container1',
+            type: 'container',
+            wrappers: [],
+            fields: [{ key: 'nested-page', type: 'page', fields: [] }],
+          },
+        ],
+      };
+
+      expect(validatePageNesting(pageField)).toBe(false);
+    });
+
+    it('should return false for nested page inside container wrapping a row', () => {
+      const pageField: PageField<any> = {
+        key: 'invalid-page',
+        type: 'page',
+        fields: [
+          {
+            key: 'container1',
+            type: 'container',
+            wrappers: [],
+            fields: [
+              {
+                key: 'row1',
+                type: 'row',
+                fields: [{ key: 'nested-page', type: 'page', fields: [] }],
+              },
+            ],
+          },
+        ],
+      };
+
+      expect(validatePageNesting(pageField)).toBe(false);
+    });
+
+    it('should return false for nested page inside row wrapping a container', () => {
+      const pageField: PageField<any> = {
+        key: 'invalid-page',
+        type: 'page',
+        fields: [
+          {
+            key: 'row1',
+            type: 'row',
+            fields: [
+              {
+                key: 'container1',
+                type: 'container',
+                wrappers: [],
+                fields: [{ key: 'nested-page', type: 'page', fields: [] }],
+              },
+            ],
+          },
+        ],
+      };
+
+      expect(validatePageNesting(pageField)).toBe(false);
+    });
+
+    it('should return true for page with container holding only leaf fields', () => {
+      const pageField: PageField<any> = {
+        key: 'valid-page',
+        type: 'page',
+        fields: [
+          {
+            key: 'container1',
+            type: 'container',
+            wrappers: [],
+            fields: [
+              { key: 'input1', type: 'input' },
+              { key: 'input2', type: 'input' },
+            ],
+          },
+        ],
+      };
+
+      expect(validatePageNesting(pageField)).toBe(true);
+    });
   });
 });

@@ -9,6 +9,7 @@ import { getNestedValue } from '../expressions/value-utils';
 import { Logger } from '../../providers/features/logger/logger.interface';
 import type { WarningTracker } from '../../utils/warning-tracker';
 import { computeValueFromEntry } from '../derivation/compute-derived-value';
+import { getParentPathInScope, resolveArrayItemScope } from '../derivation/evaluation-scope';
 import { PropertyDerivationCollection, PropertyDerivationEntry } from './property-derivation-types';
 import { PropertyOverrideStore } from './property-override-store';
 
@@ -219,6 +220,13 @@ function tryApplyArrayPropertyDerivation(entry: PropertyDerivationEntry, context
 /**
  * Creates an evaluation context for property derivation processing.
  *
+ * Note: `fieldState`/`formFieldState` are intentionally not populated here.
+ * Property derivations run against the form value signal and write to a
+ * separate override store; the applicator does not have access to the live
+ * `FieldTree` (no `rootForm` on `PropertyDerivationApplicatorContext`), so
+ * field-state snapshots cannot be read in this pipeline. Functions that need
+ * field state (e.g. `dirty()`, `touched()`) must use a regular derivation.
+ *
  * @internal
  */
 function createEvaluationContext(
@@ -228,10 +236,16 @@ function createEvaluationContext(
 ): EvaluationContext {
   const fieldValue = getNestedValue(formValue, entry.fieldKey);
 
+  // Parent group value: the absolute path with the trailing field segment
+  // dropped. `undefined` when the field is at form root.
+  const parentPath = getParentPathInScope(entry.fieldKey);
+  const groupValue = parentPath ? getNestedValue(formValue, parentPath) : undefined;
+
   return {
     fieldValue,
     formValue,
     fieldPath: entry.fieldKey,
+    groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,
     logger: context.logger,
@@ -251,10 +265,14 @@ function createArrayItemEvaluationContext(
   arrayPath: string,
   context: PropertyDerivationApplicatorContext,
 ): EvaluationContext {
+  const pathInfo = parseArrayPath(entry.fieldKey);
+  const { relativePath, groupValue, fieldValue } = resolveArrayItemScope(pathInfo, arrayItem);
+
   return {
-    fieldValue: arrayItem,
+    fieldValue,
     formValue: arrayItem,
-    fieldPath: `${arrayPath}.${itemIndex}`,
+    fieldPath: relativePath ? `${arrayPath}.${itemIndex}.${relativePath}` : `${arrayPath}.${itemIndex}`,
+    groupValue,
     customFunctions: context.customFunctions,
     externalData: context.externalData,
     logger: context.logger,

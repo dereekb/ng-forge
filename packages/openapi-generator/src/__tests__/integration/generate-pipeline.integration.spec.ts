@@ -176,6 +176,25 @@ describe('Nested Objects', () => {
     expect(form).toContain("key: 'city'");
     expect(form).toContain("key: 'zip'");
   });
+
+  it('should not emit label on group container fields (#348)', async () => {
+    await generate('nested-objects.yaml');
+
+    const form = await readGenerated(outputDir, 'forms', 'create-profile.form.ts');
+    // Anchored regex avoids the silently-passing-empty-substring trap if codegen
+    // ever reorders properties: a `label:` line MUST NOT appear between the
+    // `key: 'address'` and `type: 'group'` lines (with any whitespace in between).
+    expect(form).toMatch(/key: 'address',\s*type: 'group',\s*(?!label:)/);
+  });
+
+  it('should produce a form file that compiles against the published types (regression for #348)', async () => {
+    await generate('nested-objects.yaml');
+
+    const formPath = join(outputDir, 'forms', 'create-profile.form.ts');
+    const diagnostics = typecheckGeneratedForm(formPath);
+
+    expect(diagnostics, `Generated form should type-check cleanly. Errors:\n${diagnostics.join('\n')}`).toEqual([]);
+  }, 30_000); // tsc program creation + type-check is slow in CI
 });
 
 // ─── E. Arrays ───────────────────────────────────────────────────────
@@ -200,6 +219,25 @@ describe('Arrays', () => {
     const form = await readGenerated(outputDir, 'forms', 'create-team.form.ts');
     expect(form).toContain("key: 'scores'");
   });
+
+  it('should not emit label on array container fields (#348)', async () => {
+    await generate('arrays.yaml');
+
+    const form = await readGenerated(outputDir, 'forms', 'create-team.form.ts');
+    // Anchored regexes: outer array fields must not carry a `label:` between
+    // their `key`/`type` header (templates and child fields are allowed to).
+    expect(form).toMatch(/key: 'members',\s*type: 'array',\s*(?!label:)/);
+    expect(form).toMatch(/key: 'scores',\s*type: 'array',\s*(?!label:)/);
+  });
+
+  it('should produce a form file that compiles against the published types (regression for #348)', async () => {
+    await generate('arrays.yaml');
+
+    const formPath = join(outputDir, 'forms', 'create-team.form.ts');
+    const diagnostics = typecheckGeneratedForm(formPath);
+
+    expect(diagnostics, `Generated form should type-check cleanly. Errors:\n${diagnostics.join('\n')}`).toEqual([]);
+  }, 30_000); // tsc program creation + type-check is slow in CI
 });
 
 // ─── F. allOf ────────────────────────────────────────────────────────

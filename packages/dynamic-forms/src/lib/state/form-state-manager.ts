@@ -39,7 +39,7 @@ import { SchemaRegistryService } from '../core/registry/schema-registry.service'
 import { createSchemaFromFields } from '../core/schema-builder';
 import { createFormLevelSchema } from '../core/form-schema-merger';
 import { collectCrossFieldEntries } from '../core/cross-field/cross-field-collector';
-import { isEqual } from '../utils/object-utils';
+import { deepMergeDefaults, isEqual } from '../utils/object-utils';
 import { CONTAINER_FIELD_PROCESSORS } from '../utils/container-utils/container-field-processors';
 import { derivedFromDeferred } from '../utils/derived-from-deferred/derived-from-deferred';
 import { reconcileFields, ResolvedField, resolveField, resolveFieldSync } from '../utils/resolve-field/resolve-field';
@@ -324,7 +324,10 @@ export class FormStateManager<
       const defaults = this.defaultValues();
       const keys = this.validKeys();
 
-      const combined = { ...defaults, ...inputValue };
+      // Deep-merge so a partial nested object in `inputValue` (e.g. a group
+      // value missing one of its declared sub-field keys) does not orphan
+      // the absent sub-field in the Signal Forms validation graph.
+      const combined = deepMergeDefaults(defaults as Record<string, unknown>, inputValue as Record<string, unknown>);
 
       if (keys) {
         const filtered: Record<string, unknown> = {};

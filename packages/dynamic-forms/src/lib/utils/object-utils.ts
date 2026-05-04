@@ -211,6 +211,58 @@ export function mapValues<T, U>(obj: Record<string, T>, fn: (value: T, key: stri
 }
 
 /**
+ * Deep-merges `value` into `defaults`, producing a new object that contains every
+ * key from `defaults` plus any overrides from `value`. Plain-object values at
+ * matching keys are merged recursively; arrays, dates, and primitives in `value`
+ * replace the corresponding default wholesale.
+ *
+ * Used by `FormStateManager.entity` so a partial input value (e.g. a nested
+ * group object missing one of its declared sub-fields) does not orphan the
+ * absent sub-field in Angular Signal Forms' validation graph.
+ *
+ * @example
+ * ```typescript
+ * deepMergeDefaults(
+ *   { a: { line1: '', line2: '', city: '' }, b: 0 },
+ *   { a: { line1: 'X', city: 'Y' }, b: 1 },
+ * );
+ * // { a: { line1: 'X', line2: '', city: 'Y' }, b: 1 }
+ * ```
+ */
+export function deepMergeDefaults<T extends Record<string, unknown>>(defaults: T, value: Record<string, unknown> | null | undefined): T {
+  if (value == null) return { ...defaults };
+
+  const result: Record<string, unknown> = { ...defaults };
+
+  for (const key of Object.keys(value)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+
+    const incoming = value[key];
+    const existing = result[key];
+
+    if (isPlainObject(existing) && isPlainObject(incoming)) {
+      result[key] = deepMergeDefaults(existing, incoming);
+    } else {
+      result[key] = incoming;
+    }
+  }
+
+  return result as T;
+}
+
+/**
+ * @internal
+ * Returns true for objects that should be deep-merged (plain objects produced
+ * by literals or `Object.create(null)`); false for arrays, Dates, RegExps,
+ * Maps, Sets, class instances, and primitives.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === null || proto === Object.prototype;
+}
+
+/**
  * Options for memoize function
  */
 /** Default maximum cache size for memoized functions */

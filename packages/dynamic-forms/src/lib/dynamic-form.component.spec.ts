@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DynamicForm } from './dynamic-form.component';
 import { delay } from '@ng-forge/utils';
@@ -1127,6 +1128,94 @@ describe('DynamicFormComponent', () => {
       expect(component.formValue()).toEqual({
         firstName: 'Jane',
         lastName: 'Smith',
+      });
+    });
+
+    // Regression: when a partial value is applied to a `group` field, the
+    // omitted sub-fields must retain their declared defaults. Pre-fix, the
+    // shallow merge in `FormStateManager.entity` replaced the full nested
+    // default object with the partial value, causing Angular Signal Forms
+    // to throw `NG01902: Orphan field` from its deep-signal validation graph.
+    describe('partial value applied to nested group field', () => {
+      const addressGroupConfig: TestFormConfig = {
+        fields: [
+          {
+            key: 'a',
+            type: 'group',
+            label: 'Address',
+            fields: [
+              { key: 'line1', type: 'input', label: 'Line 1', value: '' },
+              { key: 'line2', type: 'input', label: 'Line 2', value: '' },
+              { key: 'city', type: 'input', label: 'City', value: '' },
+              { key: 'state', type: 'input', label: 'State', value: '' },
+              { key: 'zip', type: 'input', label: 'ZIP', value: '' },
+            ],
+          },
+        ],
+      };
+
+      const partialAddressValue = {
+        a: {
+          line1: '701 Brazos St.',
+          city: 'Austin',
+          state: 'TX',
+          zip: '78701',
+          // line2 intentionally omitted
+        },
+      };
+
+      const expectedSettledValue = {
+        a: {
+          line1: '701 Brazos St.',
+          line2: '',
+          city: 'Austin',
+          state: 'TX',
+          zip: '78701',
+        },
+      };
+
+      const collectOrphanErrors = (errors: unknown[]): string[] =>
+        errors
+          .map((e) => (Array.isArray(e) ? e.map(String).join(' ') : String(e)))
+          .filter((msg) => msg.includes('NG01902') || msg.includes('Orphan field'));
+
+      it('back-fills omitted sub-field with default when partial value is set at construction', async () => {
+        const errors: unknown[] = [];
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args));
+
+        const { component, fixture } = createComponent(addressGroupConfig, partialAddressValue);
+        await waitForDynamicComponents(fixture);
+
+        consoleSpy.mockRestore();
+
+        expect(component.formValue()).toEqual(expectedSettledValue);
+        expect(collectOrphanErrors(errors)).toEqual([]);
+      });
+
+      it('back-fills omitted sub-field with default when partial value is set after render', async () => {
+        const errors: unknown[] = [];
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args));
+
+        const { component, fixture } = createComponent(addressGroupConfig);
+        await waitForDynamicComponents(fixture);
+
+        expect(component.formValue()).toEqual({
+          a: { line1: '', line2: '', city: '', state: '', zip: '' },
+        });
+
+        fixture.componentRef.setInput('value', partialAddressValue);
+        await waitForDynamicComponents(fixture);
+
+        // Touch every signal that depends on the validation graph — pre-fix,
+        // any of these reads would trigger NG01902.
+        void component.valid();
+        void component.errors();
+        void component.formValue();
+
+        consoleSpy.mockRestore();
+
+        expect(component.formValue()).toEqual(expectedSettledValue);
+        expect(collectOrphanErrors(errors)).toEqual([]);
       });
     });
   });

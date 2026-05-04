@@ -1183,39 +1183,43 @@ describe('DynamicFormComponent', () => {
         const errors: unknown[] = [];
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args));
 
-        const { component, fixture } = createComponent(addressGroupConfig, partialAddressValue);
-        await waitForDynamicComponents(fixture);
+        try {
+          const { component, fixture } = createComponent(addressGroupConfig, partialAddressValue);
+          await waitForDynamicComponents(fixture);
 
-        consoleSpy.mockRestore();
-
-        expect(component.formValue()).toEqual(expectedSettledValue);
-        expect(collectOrphanErrors(errors)).toEqual([]);
+          expect(component.formValue()).toEqual(expectedSettledValue);
+          expect(collectOrphanErrors(errors)).toEqual([]);
+        } finally {
+          consoleSpy.mockRestore();
+        }
       });
 
       it('back-fills omitted sub-field with default when partial value is set after render', async () => {
         const errors: unknown[] = [];
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation((...args) => errors.push(args));
 
-        const { component, fixture } = createComponent(addressGroupConfig);
-        await waitForDynamicComponents(fixture);
+        try {
+          const { component, fixture } = createComponent(addressGroupConfig);
+          await waitForDynamicComponents(fixture);
 
-        expect(component.formValue()).toEqual({
-          a: { line1: '', line2: '', city: '', state: '', zip: '' },
-        });
+          expect(component.formValue()).toEqual({
+            a: { line1: '', line2: '', city: '', state: '', zip: '' },
+          });
 
-        fixture.componentRef.setInput('value', partialAddressValue);
-        await waitForDynamicComponents(fixture);
+          fixture.componentRef.setInput('value', partialAddressValue);
+          await waitForDynamicComponents(fixture);
 
-        // Touch every signal that depends on the validation graph — pre-fix,
-        // any of these reads would trigger NG01902.
-        void component.valid();
-        void component.errors();
-        void component.formValue();
+          // Touch every signal that depends on the validation graph — pre-fix,
+          // any of these reads would trigger NG01902.
+          void component.valid();
+          void component.errors();
+          void component.formValue();
 
-        consoleSpy.mockRestore();
-
-        expect(component.formValue()).toEqual(expectedSettledValue);
-        expect(collectOrphanErrors(errors)).toEqual([]);
+          expect(component.formValue()).toEqual(expectedSettledValue);
+          expect(collectOrphanErrors(errors)).toEqual([]);
+        } finally {
+          consoleSpy.mockRestore();
+        }
       });
     });
   });

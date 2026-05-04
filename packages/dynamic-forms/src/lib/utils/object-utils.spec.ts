@@ -400,5 +400,25 @@ describe('object-utils', () => {
 
       expect(deepMergeDefaults(defaults, value)).toEqual({ a: null });
     });
+
+    it('should not be vulnerable to prototype pollution via __proto__', () => {
+      const defaults: Record<string, unknown> = { a: 1 };
+      const value = JSON.parse('{"__proto__": {"polluted": true}, "a": 2}') as Record<string, unknown>;
+
+      const result = deepMergeDefaults(defaults, value);
+
+      expect(result).toEqual({ a: 2 });
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    });
+
+    it('should not merge constructor or prototype keys', () => {
+      const defaults: Record<string, unknown> = { a: 1 };
+      const value: Record<string, unknown> = { constructor: { evil: true }, prototype: { evil: true }, a: 2 };
+
+      const result = deepMergeDefaults(defaults, value);
+
+      expect(result).toEqual({ a: 2 });
+    });
   });
 });

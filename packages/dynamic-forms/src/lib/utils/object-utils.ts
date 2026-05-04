@@ -235,6 +235,8 @@ export function deepMergeDefaults<T extends Record<string, unknown>>(defaults: T
   const result: Record<string, unknown> = { ...defaults };
 
   for (const key of Object.keys(value)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+
     const incoming = value[key];
     const existing = result[key];
 
